@@ -136,9 +136,9 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
       * 保持 3-5 秒后松开 Recovery 键。
 3.  **观察日志：** 观察串口日志，看到 `UEFI firmware` 和 `Shell (F1)` 提示即为成功。
 
-### 3\. 引导系统测试
+### 5\. 引导系统测试
 
-*TODO...*
+1. 启动Ubuntu22.04 ARM64 Server 需要添加启动参数console=ttyS2 1500000n8 earlycon=uart8250,mmio32,0xfeb50000 acpi=force
 
 -----
 
