@@ -334,8 +334,8 @@ HdmiTxIomux (
 PWM_DATA  pwm_data = {
   .ControllerID = PWM_CONTROLLER0, // DTS: pwm0
   .ChannelID    = PWM_CHANNEL0,    // Channel 0
-  .PeriodNs     = 50000,
-  .DutyNs       = 50000,
+  .PeriodNs     = 5000,
+  .DutyNs       = 1000, // 20% Duty Cycle
   .Polarity     = FALSE,
 };
 
@@ -347,9 +347,9 @@ PwmFanIoSetup (
 {
   /* Fan PinMux:
    * DTS: pinctrl-0 = <&pwm0m2_pins>
-   * Map: PWM0_M2 -> GPIO4_PB0 (Function 11)
+   * Map: PWM0_M2 -> GPIO1_PA2
    */
-  GpioPinSetFunction (4, GPIO_PIN_PB0, 11); 
+  GpioPinSetFunction (1, GPIO_PIN_PA2, 11);  
   
   RkPwmSetConfig (&pwm_data);
   RkPwmEnable (&pwm_data);
@@ -414,4 +414,9 @@ PlatformEarlyInit (
   // GPIO1_PA6 (Active High)
   GpioPinSetDirection (1, GPIO_PIN_PA6, GPIO_PIN_OUTPUT);
   GpioPinWrite (1, GPIO_PIN_PA6, TRUE);
+
+  /* 【NEW】 强制初始化风扇 */
+  // 这会根据 pwm_data 的设置（目前是 100% 转速）立即启动风扇
+  // 避免 CPU 在高负载下过热
+  PwmFanIoSetup();
 }

@@ -119,11 +119,11 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
 
 这是最安全的方法，不会影响板载 eMMC 里的系统。
 
-1. **找到设备：** 确认你的 TF 卡在 Linux 下的设备名，例如 `/dev/sdb` (⚠️ **务必小心确认设备名**)。
+1. **找到设备：** 确认你的 TF 卡在 Linux 下的设备名，例如 `/dev/sda` (⚠️ **务必小心确认设备名**)。
 2.  **执行 DD 写入：**
     ```bash
-    # 假设 TF 卡设备名为 /dev/sdb
-    sudo dd if=RK3588_NOR_FLASH.img of=/dev/sdb bs=1M status=progress conv=fsync
+    # 假设 TF 卡设备名为 /dev/sda
+    sudo dd if=RK3588_NOR_FLASH.img of=/dev/sda bs=1M status=progress conv=fsync
     ```
 
 ### 4\. 启动流程
@@ -150,12 +150,12 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
 
 | 功能模块 | 配置状态 | 实际验证状态 | 待办事项 / 备注 |
 | :--- | :--- | :--- | :--- |
-| **引导启动** | ✅ 启用 | 待测试 | 需连接 USB 启动盘 (Ubuntu/Win on ARM) 验证 OS 加载能力。|
+| **引导启动** | ✅ 启用 | ✅ | OS 可以正常加载 |
 | **Ethernet** | ✅ 启用 | **待测试** | 驱动已加载，MAC 地址已获取，但未进行网络数据传输测试。|
-| **mini-PCIE** | ✅ 启用 | **待测试** | PCIe 链路已连接 (Link up)，但未测试 NVMe 或 Wi-Fi/4G 模块的枚举与使用。|
-| **USB 2.0/3.0** | ✅ 启用 | **待测试** | 仅验证了键盘输入和 U 盘枚举，需在 OS 中测试所有 Type-A 接口的稳定性。|
+| **mini-PCIE** | ✅ 启用 | ✅ | PCIe 链路已连接 (Link up)，测试了Wi-Fi网卡模块的使用。|
+| **USB 2.0/3.0** | ✅ 启用 | ✅ | 仅验证了键盘输入和 U 盘枚举，需在 OS 中测试所有 Type-A 接口的稳定性。|
 | **GPIO (通用)** | ✅ 启用 | **待测试** | 40-Pin 扩展接口的通用 GPIO 功能尚未验证。|
-| **cpufreq** | ✅ 启用 | **待测试** | CPU 频率调节 (DVFS) 依赖 SCMI 协议，需要在 Linux/Windows 下确认频率切换是否正常。|
+| **cpufreq** | ✅ 启用 | ❌ | 虽然无法切换频率，但是CPU似乎已经保持在一个较高的频率下工作 |
 
 ### 2\. 硬件功能 (I/O & Multimedia)
 
@@ -164,7 +164,7 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
 | **HDMI/DP** | ✅ 启用 | **待测试** | UEFI 启动日志显示 `Not Found`。需要连接显示器并加载 GOP 驱动进行显示功能验证。|
 | **Type-C** | ✅ 启用 | **待测试** | DP 输出和 OTG 模式的切换功能尚未验证。|
 | **音频 (ES8388)** | ✅ 启用 | **待测试** | Codec 驱动已加载，I2C 通信正常，但音频输出/输入功能需在 OS 中测试。|
-| **Fan (PWM)** | ✅ 启用 | **待测试** | PWM 驱动已配置，需测试风扇是否能根据温度变化正常调速。|
+| **Fan (PWM)** | ✅ 启用 | ✅ | PWM 驱动已配置，似乎手动指定占空比无效，转速似乎恒定100% |
 
 ### 3\. 已知残留问题 (Known Issues)
 
