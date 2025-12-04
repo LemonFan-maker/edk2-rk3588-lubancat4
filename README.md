@@ -1,464 +1,196 @@
-# EDK2 UEFI firmware for Rockchip RK3588 platforms
-This repository contains an UEFI firmware implementation based on EDK2 for various RK3588 boards.
+# 💻 鲁班猫4 (RK3588S) UEFI 固件移植
 
-It delivers a PC-like standardized boot experience, supporting multiple operating systems, such as Windows, Linux, BSD and VMware ESXi.
+这是野火鲁班猫4 (LubanCat 4) 开发板的 UEFI 固件移植项目，基于 `edk2-porting` 社区代码，旨在实现对标准 AArch64 操作系统 (如 Windows on ARM, Ubuntu Server) 的完美引导。
 
-![EDK2 Front Page](images/edk2-frontpage.png)
+**项目状态:** 编译成功，启动并进入 UEFI Shell / BIOS Setup。
 
-# Supported platforms
-Support levels are categorized into two tiers: Platinum and Bronze.
+-----
 
-Platinum devices are considered to have the best overall support, based on factors such as:
-- Device Tree and peripherals compatible with mainline Linux. [**Required**]
-- Active interest from the vendor in supporting their hardware.
-- Hardware design choices:
-  - If an Ethernet port is present, Realtek PCIe NIC or integrated GMAC. [**Required**]
-  - SPI NOR flash for dedicated firmware storage. [Preferred]
+## ✨ 核心特性与适配情况
 
-Bronze devices may have limitations such as:
-- Missing one or more required features listed above.
-- Low interest from vendors and/or the community.
-- Lack of proper validation, potentially affecting functionality.
+| 模块 | 状态 | 详细信息 |
+| :--- | :--- | :--- |
+| **SoC** | ✅ 匹配 | Rockchip RK3588S |
+| **内存** | ✅ 完美 | 识别并使用全部 16GB LPDDR4X (四通道) |
+| **PMIC** | ✅ 稳定 | RK806/RK860x 电压轨配置严格匹配 DTS，启动稳定 |
+| **存储** | ✅ 工作 | eMMC (三星BJNB4R) 和 TF 卡 (SDHCI) 驱动正常 |
+| **网络** | ✅ 工作 | GMAC1 (RTL8211F) 千兆以太网，TX Delay 修正 |
+| **USB** | ✅ 正常 | USB 2.0 / USB 3.0 Host 接口供电和驱动正常 |
+| **I2C/RTC** | ✅ 修复 | 解决了 `I2C Timeout` 报错，HYM8563 RTC 时钟总线修正至 I2C0 |
+| **ACPI/SMBIOS** | ✅ 启用 | ACPI 表和 SMBIOS (CPU/RAM/Board Info) 正常加载 |
 
-Note that this list is subject to change at any time as devices gain better support or fall behind.
+-----
 
-## Platinum
-- [Radxa ROCK 5B](https://radxa.com/products/rock5/5b/)
-- [Radxa ROCK 5A](https://radxa.com/products/rock5/5a/)
-- [Radxa ROCK 5 ITX](https://radxa.com/products/rock5/5itx/)
-- [Orange Pi 5](http://www.orangepi.org/html/hardWare/computerAndMicrocontrollers/details/Orange-Pi-5.html)
-- [Orange Pi 5 Plus](http://www.orangepi.org/html/hardWare/computerAndMicrocontrollers/details/Orange-Pi-5-plus.html)
-- [Khadas Edge2](https://www.khadas.com/edge2)
-- [BuzzTV P6](https://buzztvglobal.com/products/powerstation-6)
-- [FriendlyELEC NanoPC T6](https://wiki.friendlyelec.com/wiki/index.php/NanoPC-T6)
-- [FriendlyELEC NanoPi R6C](https://wiki.friendlyelec.com/wiki/index.php/NanoPi_R6C)
-- [FriendlyELEC NanoPi R6S](https://wiki.friendlyelec.com/wiki/index.php/NanoPi_R6S)
-- [FriendlyELEC NanoPC CM3588-NAS](https://wiki.friendlyelec.com/wiki/index.php/CM3588_NAS_Kit)
-- [ameriDroid Indiedroid Nova](https://indiedroid.us)
+## 🛠️ 编译环境准备 (Build Prerequisites)
 
-## Bronze
-- [Radxa ROCK 5B+](https://radxa.com/products/rock5/5bp)
-- [Fydetab Duo](https://fydetabduo.com/)
-- [Firefly AIO-3588Q](https://en.t-firefly.com/product/industry/aio3588q)
-- [Firefly ITX-3588J](https://en.t-firefly.com/product/industry/itx3588j)
-- [Firefly ROC-RK3588S-PC](https://en.t-firefly.com/product/industry/rocrk3588spc) / [StationPC Station M3](https://www.stationpc.com/product/stationm3)
-- [Mekotronics R58X](https://www.mekotronics.com/h-pd-75.html)
-- [Mekotronics R58 Mini](https://www.mekotronics.com/h-pd-76.html)
-- [Mixtile Blade 3](https://www.mixtile.com/blade-3)
-- [FriendlyELEC NanoPi M6](https://wiki.friendlyelec.com/wiki/index.php/NanoPi_M6)
-- [Hinlink H88K](http://www.hinlink.com)
+你需要一个支持 AArch64 交叉编译的 Linux 环境 (推荐 Ubuntu 20.04/22.04)。
 
-# Supported OSes
-## In ACPI mode
-| OS | Version | Tested/supported hardware | Notes |
-| --- | --- | --- | --- |
-| Windows | 11 | [Status](https://github.com/worproject/Rockchip-Windows-Drivers#hardware-support-status) ||
-| NetBSD | 10 | Display, UART, USB, PCIe (incl. NVME), SATA, eMMC, GMAC Ethernet ||
-| VMware ESXi Arm Fling | >= 1.12 | Display, USB | * PCIe devices will hang at boot, need to disable in settings or leave the ports empty.<br>* GMAC Ethernet gets detected but does not work. |
-| Linux | tested Ubuntu 22.04, kernel 5.15.0-75-generic | Display, UART, USB, PCIe (incl. NVME & Ethernet), SATA | For full hardware functionality, use a kernel with RK3588 support and switch to Device Tree mode. |
+### 1\. 安装依赖
 
-> [!NOTE]
-> ACPI support is only being developed and tested against Windows. There are no plans to further improve functionality for other OSes. Consider using Device Tree instead (where applicable, for instance Linux).
-
-## In Device Tree mode
-### Vendor compatibility mode
-| OS | Version | Tested/supported hardware | Notes |
-| --- | --- | --- | --- |
-| Rockchip SDK Linux | Kernel 5.10/6.1<br> Tested with:<br> - [Armbian rk3588-live-iso](https://github.com/amazingfate/rk3588-live-iso) | Platform-dependent, most peripherals work. | If using a different kernel, see [Device Tree configuration](#device-tree-configuration). |
-
-### Mainline compatibility mode
-| OS | Version | Tested/supported hardware | Notes |
-| --- | --- | --- | --- |
-| Generic upstream Linux | Kernel 6.10 or newer.<br> Tested with:<br> - Ubuntu 24.10<br> - Fedora Workstation 41<br> - Fedora Workstation Rawhide | Platform and kernel version dependent, see [Collabora's RK3588 upstream status](https://gitlab.collabora.com/hardware-enablement/rockchip-3588/notes-for-rockchip-3588/-/blob/main/mainline-status.md). | * Kernels older than 6.15 lack display output. To work around this, see: [Device Tree configuration](#device-tree-configuration). |
-
-> [!NOTE]
-> Mainline support is only available on [Platinum](#platinum) platforms.
-
-# Supported peripherals in UEFI
-
-> [!NOTE]
-> Applicable to all platforms unless otherwise noted.
->
-> Only devices relevant to the firmware itself (not OS) are listed below.
-
-| Device | Status | Notes |
-| --- | --- | --- |
-| USB 3 / 2.0 / 1.1                     | 🟢 Working     | Host-mode only, USB 3 devices connected to a Type-C port only work in one orientation. |
-| PCIe 3.0 / 2.1                        | 🟢 Working     | |
-| SATA                                  | 🟢 Working     | |
-| SD/eMMC                               | 🟢 Working     | |
-| HDMI output                           | 🟢 Working     | |
-| DisplayPort output (USB-C)            | 🟡 Partial     | No hot-plug detect & EDID. Only works in one orientation of the Type-C port. Some displays may not work regardless. |
-| eDP output                            | 🟡 Partial     | Disabled, requires manual configuration depending on the platform and panel. |
-| DSI output                            | 🟢 Working     | Only enabled on Fydetab Duo. Requires manual configuration depending on the platform and panel. |
-| GMAC Ethernet                         | 🟢 Working     | |
-| Realtek PCIe Ethernet                 | 🟢 Working     | Some platforms don't have MAC addresses set, networking may not work in that case. |
-| Low-speed (GPIO/UART/I2C/SPI/PWM)     | 🟢 Working     | UART2 console available at 1500000 baud rate |
-| SPI NOR Flash                         | 🟢 Working     | |
-| HYM8563 real-time clock               | 🟢 Working     | |
-| RNG                                   | 🟢 Working     | |
-| Cooling fan                           | 🟢 Working     | Supported on most platforms. Fan connector where present, otherwise available at the GPIO header for 3-pin PWM fans (do *not* connect 2-pin fans there!):<br>* Orange Pi 5: `GPIO4_B2`<br>* Indiedroid Nova: `GPIO4_B4` |
-| Status LED                            | 🟢 Working     | |
-| Voltage regulators (RK806/RK860)      | 🟢 Working     | |
-| FUSB302 USB Type-C Controller         | 🔴 Not working | Required for PD negotiation and connector orientation switching |
-
-# Getting started
-## 1. Requirements
-* One of the [supported devices](#supported-platforms).
-* Storage for the firmware: SPI NOR flash (included with some devices), SD card or eMMC.
-* Quality power supply that can provide at least 15 W. Depending on the peripherals you use, more may be needed.
-
-  Note: on Mixtile Blade 3, a fixed voltage *higher than* 5V must be supplied. The board cannot power any external peripherals if the input voltage is just 5V. USB-PD negotiation is not supported by firmware.
-* HDMI (preferred) or DisplayPort (USB-C) screen.
-* Optionally, if display is not available or for debugging purposes, an UART adapter capable of 1500000 baud rate (e.g. USB CH340, CP2104).
-
-## 2. Download the firmware image
-The latest version can be obtained from <https://github.com/edk2-porting/edk2-rk3588/releases>.
-
-If your platform is not yet supported, using an image meant for another device is **NOT** recommended. Although they are generally similar, voltage setup can happen to be different and you may risk damaging the board. External peripherals are unlikely to work either.
-
-## 3. Flash the firmware
-UEFI can be flashed to either an SPI NOR flash, SD card or eMMC module:
-* For removable SD or eMMC (easiest), you can simply use balenaEtcher, RPi Imager or dd.
-* For SPI NOR or soldered eMMC, instructions can be found at: <https://docs.radxa.com/en/rock5/lowlevel-development/bootloader_spi_flash>.
-
-  In short, you can flash the image from Linux booted on the device or by using RKDevTool on another computer. The latter requires entering Maskrom mode on the device. The way to do this slightly varies across platforms, refer to your vendor documentation.
-
-**Warning:** these operations will erase data on the storage device. Make a backup first!
-
-If you wish to have both UEFI and an OS on the same SD or eMMC device: flash UEFI first, then create any additional partitions without touching the first, reserved one. Steps for updating the firmware in this case can be found [here](#updating-the-firmware).
-
-Note: Using SPI NOR (if present) is recommeded, as it leaves the other storage options free for other purposes. Additionally, SD/eMMC will limit the firmware's ability to access its own storage (variable store) when an OS is running. This feature is mostly used by OS installers to create the boot menu options, it is not mandatory.
-
-## 4. Connect peripherals and power on the device
-If the flashing process has been done correctly, you should see the status LED blinking (if present), and shortly after, the platform's boot logo with a progress bar at the bottom on the connected display.
-
-At this stage, you can press <kbd>Esc</kbd> to enter the firmware setup, <kbd>F1</kbd> to launch the UEFI Shell, or, provided you also have an UEFI bootloader/app on a storage device, you can let the system automatically run that, which is the default behavior if no action is taken.
-
-Check the [Supported OSes](#supported-oses) and [Supported peripherals in UEFI](#supported-peripherals-in-uefi) sections to see what's currently possible with this firmware.
-
-Also check the configuration options described below, some of which may need to be changed depending on the OS used.
-
-If you experience any issues, please see the [Troubleshooting](#troubleshooting) section.
-
-# Configuration settings
-The UEFI provides a few configuration options, like CPU frequency, PCIe/SATA selection for an M.2 port, fan control, etc. These can be viewed and changed using the UI configuration menu (under `Device Manager`->`Rockchip Platform Configuration`).
-
-Configuration through the user interface is fairly straightforward and help/navigation information is provided around the menus.
-
-## Tips
-### Boot time optimization
-* If there are unused M.2/PCIe slots, you can disable them to skip initialization: `Device Manager`->`Rockchip Platform Configuration`->`PCIe/SATA/USB Combo PIPE PHY` and set the relevant PHYs to `Unconnected`. Do the same for `PCI Express 3.0` by setting `Support State` to `Disabled`.
-
-* Auto boot time-out can be decreased from `Boot Maintenance Manager`.
-
-* If network boot is not used, it can be disabled: `Device Manager`->`Network Stack Configuration` then uncheck `Network Stack`.
-
-* If you do not need the ability to hot-plug displays or use DisplayPort while in the firmware: `Device Manager`->`Rockchip Platform Configuration`->`Display` and set `Force Output` to `Disabled`. This will skip display initialization when none is connected.
-
-* By default, the firmware connects all boot devices regardless of whether they are needed for the current boot. This is done to address potential compatibility issues and generally takes a negligible amount of time, thus it is recommended to not change it. However, it is still possible to do so: `Boot Maintenance Manager`->`Boot Discovery Policy`.
-
-### Linux boot
-* If you're getting a Synchronous Exception when booting certain distros, go to `Device Manager`->`EFI Memory Attribute Protocol` and uncheck `Enable Protocol`.
-
-## Device Tree configuration
-For rich Linux support, it is recommended to enable Device Tree mode. You can do so by going to `Device Manager`->`Rockchip Platform Configuration`->`ACPI / Device Tree` and setting `Config Table Mode` to `Device Tree`.
-
-The firmware provides two compatibility modes:
-* `Vendor` - compatible with Rockchip SDK Linux 5.10/6.1 kernel only.
-* `Mainline` - compatible with generic upstream Linux 6.10 or newer kernel. This option is under active development and may lack certain features. Therefore, it is always recommended to use the latest kernel and firmware available in order to benefit from better device support.
-
-[Platinum](#platinum) platforms will have the `Mainline` option enabled by default, while [Bronze](#bronze) ones will fall back to `Vendor`.
-
-> [!TIP]
-> In `Mainline` mode with generic Linux kernels older than 6.15, the HDMI output will not be usable. To use the UEFI-initialized display instead, go to `Device Manager`->`Rockchip Platform Configuration`->`ACPI / Device Tree` and enable `Force UEFI GOP Display`. Note that GPU acceleration cannot work in this mode.
-
-### Custom Device Tree Blob (DTB) override and overlays
-It is also possible to provide a custom DTB and overlays. This is useful in cases where the firmware DTB is outdated, does not match the kernel used or for testing purposes. To enable overrides, go to `Device Manager`->`Rockchip Platform Configuration`->`ACPI / Device Tree` and set `Support DTB override & overlays` to `Enabled`.
-
-The firmware will now look for overrides in all supported file systems / partitions (FAT, ext4) on the selected boot device.
-
-**Important:**
-* The paths below are relative to the root of the partition. They must not be inside any sub-directory.
-* All overrides (base DTB and overlays) must be stored within a single partition. Using a base DTB from one partition and overlays from another is not allowed.
-
-The base DTB can be placed in:
-* `\dtb`
-* `\dtb\base`
-* `\dtb\rockchip` - Fedora images have the kernel DTBs in this location on the second ext4 boot partition.
-
-and must have the `<PLATFORM-DT-NAME>.dtb` file name.
-
-The overlays can be placed in:
-* `\dtb\overlays` - will be applied first, regardless of the platform.
-* `\dtb\overlays\<PLATFORM-DT-NAME>` - will be applied only to the specified platform.
-
-and must have the `.dtbo` extension.
-
-In addition to the default paths above, it is possible to specify custom ones via the `Preferred Base DTB Path` and `Preferred Overlays Path` setup options in the menu described above.
-
-`<PLATFORM-DT-NAME>` can be:
-| Name                                    | Platform                      |
-| --------------------------------------- | ----------------------------- |
-| `rk3588-rock-5b`                        | ROCK 5B                       |
-| `rk3588-rock-5bp`                       | ROCK 5B+                      |
-| `rk3588s-rock-5a`                       | ROCK 5A                       |
-| `rk3588-rock-5-itx`                     | ROCK 5 ITX                    |
-| `rk3588s-orangepi-5`                    | Orange Pi 5                   |
-| `rk3588-orangepi-5-plus`                | Orange Pi 5 Plus              |
-| `rk3588s-9tripod-linux`                 | Indiedroid Nova               |
-| `rk3588s-fydetab-duo`                   | Fydetab Duo                   |
-| `rk3588-buzztv-p6`                      | PowerStation 6                |
-| `aio-3588q`                             | Firefly AIO-3588Q             |
-| `itx-3588j`                             | Firefly ITX-3588J             |
-| `roc-rk3588s-pc`                        | ROC-RK3588S-PC / Station M3   |
-| `rk3588-blueberry-edge-v12-linux`       | R58X (v1.2)                   |
-| `rk3588-blueberry-minipc-linux`         | R58 Mini                      |
-| `rk3588s-khadas-edge2`                  | Edge2                         |
-| `rk3588-blade3-v101-linux`              | Blade 3                       |
-| `rk3588-nanopc-t6`                      | NanoPC T6                     |
-| `rk3588-nanopc-cm3588-nas`              | NanoPC CM3588-NAS             |
-| `rk3588s-nanopi-r6c`                    | NanoPi R6C                    |
-| `rk3588s-nanopi-r6s`                    | NanoPi R6S                    |
-| `rk3588s-nanopi-m6`                     | NanoPi M6                     |
-| `rk3588-hinlink-h88k`                   | H88K                          |
-
-**Notes:**
-* The firmware applies some fix-ups to the DTB depending on the user settings (e.g. PCIe/SATA/USB selection, making SATA overlays redundant). These fix-ups are not applied when providing overrides by other means, such as the Grub `devicetree` command.
-
-* In the absence of a base DTB override, the overlays are applied on top of the firmware-provided DTB.
-
-* If the application of an overlay fails (e.g. due to incompatibility with the base DTB), all other overlays are discarded.
-
-* If the base DTB override is invalid, the firmware-provided one will be passed to the OS instead.
-
-* This process is logged to the [serial console](#advanced-troubleshooting). It is the only way to see potential errors.
-
-# Updating the firmware
-If the storage is only used for UEFI and nothing else, simply download the latest image and flash it as described in the [Getting started](#getting-started) section.
-
-If it is also used by an OS and has additional partitions, only part of the image needs to be applied. This can be done with the `dd` tool:
 ```bash
-dd if=FIRMWARE.img of=DESTINATION bs=512 skip=64 seek=64 conv=notrunc
+sudo apt update
+# 安装交叉编译器、iasl (ACPI 编译器) 和通用构建工具
+sudo apt-get install -y \
+    acpica-tools \
+    binutils-aarch64-linux-gnu \
+    build-essential \
+    device-tree-compiler \
+    gettext \
+    git \
+    gcc-aarch64-linux-gnu \
+    libc6-dev-arm64-cross \
+    python3 \
+    python3-pyelftools \
+    uuid-dev
 ```
 
-`FIRMWARE.img` is the firmware image for your platform. E.g. `edge2_UEFI_Release_v0.8.img`.
+### 2\. 配置仓库 (Git Setup)
 
-`DESTINATION` is the destination storage that you wish to update the firmware on. E.g. `/dev/sdb`.
+如果你是从本仓库克隆，请确保所有子模块都被正确拉取：
 
-Here we skip the GPT and copy the firmware starting at offset 0x8000 (`64` blocks * `512` bytes block size) until its end. See [Flash layout](#flash-layout) for more details.
-
-## Flash SPI NOR from the UEFI Shell
-1) Copy the firmware image to a FAT32 partition on a storage drive and connect it to the device.
-
-2) Launch the UEFI Shell (press <kbd>F1</kbd> during boot or go to `Boot Manager`->`UEFI Shell`).
-
-3) Navigate to the partition / file system containing the firmware image:
-   * Use the `map` command to list all mounted file systems, e.g. `fs0:`, `fs1:`, etc. Type the file system name and press <kbd>Enter</kbd> to change directory to it.
-
-   * If you're unsure which file system to use, run `ls fsX:` (replace `X` with the actual number) to list its contents.
-
-4) Run `sf updatefile FIRMWARE.img 0x0` and wait for the update process to complete.
-
-5) Reboot the device.
-
-# Troubleshooting
-
-> [!IMPORTANT]
-> First of all, make sure your device can only possibly load the UEFI firmware and nothing else.
->
-> **U-Boot must not be present on either SPI NOR, SD or eMMC, otherwise it could take precedence and cause issues.**
-
-Below you can find some basic debugging information. If none of this helps, please see the [Advanced troubleshooting](#advanced-troubleshooting) section.
-
-## Meaning of the Status LED
-If your device has an activity LED, the firmware will blink it in different patterns to indicate the current system status.
-
-1. Immediately after power on, the LED should start pulsing quickly. This indicates that the firmware is initializing.
-
-2. After initialization (usually takes less than 5 seconds), the LED will switch to a short pulsing every 2 seconds or so. This indicates that the firmware is ready and waiting for user action or the countdown to boot automatically. The display output should also be enabled at this point.
-
-3. When the firmware boots an OS and is about to exit, the LED will stop blinking.
-
-If the LED:
-* does not light up after power on, this means the firmware has not managed to load up at all.
-* gets stuck in either on or off state after blinking a few times and never recovers, something went wrong and the firmware has crashed or frozen.
-
-  Note that it is only expected to stop as described at point 3) above.
-
-## Recovery
-In case you don't have easy access to the MaskROM button, UEFI provides a boot option for that purpose, accessible either via the Boot Manager or <kbd>F4</kbd> key during splash screen.
-
-Additionally, holding the Recovery (or volume up) button while powering on the device will also enter MaskROM mode.
-
-## Common issues
-### Nothing shows up on the screen
-Make sure you've flashed the firmware correctly and that it is the version designed for your device. In most cases this is the culprit.
-
-Assuming the firmware loads fine:
-* The display must support a resolution of at least 640 x 480 at 60 Hz.
-
-* Try booting without any display connected, then plug it in after a couple of seconds (when the status LED pattern changes). This will force the firmware to output at the minimum supported resolution. You can then increase the resolution by going to `Device Manager`->`Rockchip Platform Configuration`->`Display`.
-
-* If you're using USB-C to DisplayPort, only one orientation of the USB-C connector will work. Check both.
-
-If you are still not able to get any display output, the only way to interact with UEFI is via the [serial console](#advanced-troubleshooting).
-
-### Configuration settings do not get saved
-This has been observed in cases where firmware was present on more than one device (SPI NOR, eMMC or SD). This is not a supported scenario, because UEFI will be unable to accurately determine the boot device it belongs to. The solution is to unplug or erase devices that may have other firmware on them.
-
-### USB 3 devices do not work
-* Try a different port.
-* If you're using USB-C, 3.0 devices will only work in one orientation of the connector. Check both.
-* Make sure the power supply and cable are good.
-
-### Networking does not work
-* Only integrated Gigabit Ethernet (GMAC), Realtek PCIe and USB controllers are supported.
-
-* Some boards with Realtek NICs do not have a MAC address set at factory and will show-up as being all zeros in UEFI, possibly preventing the adapter from obtaining an IP address.
-
-  You can easily fix this by writing the MAC address manually:
-
-  1. Boot into Linux and open up a terminal. The commands below apply to Armbian with legacy kernel.
-
-  2. Install the headers for your kernel version:
-      ```bash
-      sudo apt install -y linux-headers-legacy-rk35xx
-      ```
-
-  3. Clone Realtek PGTool and build the driver:
-      ```bash
-      git clone https://github.com/redchenjs/rtnicpg
-      cd rtnicpg
-      make
-      ```
-
-  4. Unload all Realtek modules and load the driver built above:
-      ```bash
-      sudo rmmod pgdrv
-      sudo ./pgload.sh
-      ```
-      Note: make sure there aren't any remaining Realtek modules loaded after this, except for the new `pgdrv`.<br> If you have `r8125` built-in, you might have to reboot with `initcall_blacklist=rtl8125_init_module` as a kernel parameter (in Grub).
-
-   5. Burn a MAC address into the eFuses:
-
-      For only one NIC:
-      ```bash
-      sudo ./rtnicpg-aarch64-linux-gnu /efuse /nodeid 00E04C001234
-      ```
-      For two or more:
-      ```bash
-      sudo ./rtnicpg-aarch64-linux-gnu /efuse /# 1 /nodeid 00E04C001234
-      sudo ./rtnicpg-aarch64-linux-gnu /efuse /# 2 /nodeid 00E04C001235
-      ```
-      `00E04C001234` is an example address. You can generate random and unique ones using: <https://www.macvendorlookup.com/mac-address-generator>
-
-  **Note:** the number of eFuses is limited, thus MAC addresses can only be changed a few times.
-
-### Wi-Fi / Bluetooth not working on mainline Linux
-The most likely cause is missing upstream firmware support. Check `dmesg` for messages that indicate firmware load errors.
-
-This can usually be fixed by manually copying the necessary blobs to `/usr/lib/firmware`.
-
-For instance, on Khadas Edge2 with an onboard AP6275P module (BCM/SYN43752):
 ```bash
-sudo wget https://github.com/armbian/firmware/raw/refs/heads/master/brcm/brcmfmac43752-pcie.bin -P /usr/lib/firmware/brcm/
-sudo wget https://github.com/armbian/firmware/raw/refs/heads/master/brcm/brcmfmac43752-pcie.clm_blob -P /usr/lib/firmware/brcm/
-sudo wget https://github.com/armbian/firmware/raw/refs/heads/master/brcm/brcmfmac43752-pcie.txt -P /usr/lib/firmware/brcm/
-sudo wget https://github.com/armbian/firmware/raw/refs/heads/master/brcm/BCM4362A2.hcd -P /usr/lib/firmware/brcm/
+# 克隆本仓库
+git clone https://github.com/LemonFan-maker/edk2-rk3588-lubancat4.git
+cd edk2-rk3588-lubancat4
+
+# 递归更新所有子模块 (包括 edk2, arm-trusted-firmware 等)
+git submodule update --init --recursive
 ```
-then reboot.
 
-## Advanced troubleshooting
-The firmware will log detailed information to the serial console when using a debug version. See the [release notes](https://github.com/edk2-porting/edk2-rk3588/releases) for details on how to obtain this version.
+-----
 
-1. The debug image needs to be flashed in place of the existing one.
+## 🚀 固件编译指南 (Building the Firmware)
 
-2. Connect the **UART2** RX, TX and GND pins on your device (check vendor documentation) to the UART adapter on your other computer.
+使用仓库自带的 `build.sh` 脚本进行编译。
 
-3. Open up a serial terminal (`PuTTY` on Windows, `stty` on Linux) set to 1500000 baud rate and 8n1 (default).
+### 1\. 执行编译
 
-4. Power on the device.
+我们使用 `lbc-4` 作为设备标识符。
 
-You should be able to see many debug messages being printed to the console. If that's not the case, double check the connections (swap RX/TX), make sure the adapter is functional and configured correctly.
+```bash
+# 编译 DEBUG 版本 (推荐用于首次测试和调试)
+./build.sh -d lbc-4 -r DEBUG
 
-The logs should give an insight of what's going on. If you need help analyzing them, feel free to open an issue ticket.
+# 编译 RELEASE 版本 (更小更快)
+./build.sh -d lbc-4 -r RELEASE
+```
 
-# Reporting issues
-You can open issues related to UEFI at <https://github.com/edk2-porting/edk2-rk3588/issues>.
+**编译成果:** 编译成功后，完整的固件镜像文件将生成在仓库根目录下：
 
-Please include as many details as possible: expected behavior, what actually happens, steps to reproduce, [serial logs](#advanced-troubleshooting), etc.
+```
+RK3588_NOR_FLASH.img
+```
 
-Also check the existing issues in case yours might be already reported.
+-----
 
-# Building
-The firmware can only be built on Linux currently. For Windows use WSL.
+## 💾 烧录与启动 (Flashing & Booting)
 
-1. Install required packages:
+**强烈建议使用 TF 卡 (MicroSD) 方式进行首次测试。**
 
-   For Ubuntu/Debian:
-   ```bash
-   sudo apt install git gcc g++ build-essential gcc-aarch64-linux-gnu acpica-tools python3-pyelftools uuid-dev python-is-python3 device-tree-compiler
-   ```
-   For Arch Linux:
-   ```bash
-   sudo pacman -Syu
-   sudo pacman -S git base-devel gcc dtc aarch64-linux-gnu-binutils aarch64-linux-gnu-gcc aarch64-linux-gnu-glibc python python-pyelftools iasl --needed
-   ```
+**⚠️ 启动优先级特别警告 (必读)**
 
-2. Clone the repository:
-   ```bash
-   git clone https://github.com/edk2-porting/edk2-rk3588.git --recursive
-   cd edk2-rk3588
-   ```
+> 如果您的板载 eMMC 中已经存在 Linux 或 Android 系统（即已刷入 `rootfs`、`boot` 和 `uboot` 分区），MaskROM 会优先从 eMMC 启动。
 
-3. Build UEFI (ROCK 5B for example, check [list of platform configs](https://github.com/edk2-porting/edk2-rk3588/tree/master/configs)):
-   ```bash
-   ./build.sh --device rock-5b --release Release # (or Debug)
-   ```
+**为确保能从 TF 卡启动，您必须先擦除 eMMC 中的 `uboot` 分区。**
 
-If you get build errors, it is very likely that you're still missing some dependencies. The list of packages above is not complete and depending on the distro you may need to install additional ones. In most cases, looking up the error messages on the internet will point you at the right packages.
+### 1\. USB/MaskROM 烧录步骤
 
-# Notes
+如果你选择通过 USB 线刷入 **`RK3588_NOR_FLASH.img`**：
 
-## Flash layout
-| Address    | Size       | Desc                  | File                   |
-| ---------- | ---------- | --------------------- | ---------------------- |
-| 0x00000000 | 0x00004400 | GPT Table             | rk3588_spi_nor_gpt.img |
-| 0x00008000 |            | IDBlock               | idblock.bin            |
-| 0x00100000 | 0x00500000 | BL33_AP_UEFI FV       | ${DEVICE}_EFI.itb      |
-| 0x007C0000 | 0x00010000 | NV_VARIABLE_STORE     |                        |
-| 0x007D0000 | 0x00010000 | NV_FTW_WORKING        |                        |
-| 0x007E0000 | 0x00010000 | NV_FTW_SPARE          |                        |
+1.  **进入 MaskROM 模式** (按住 MaskROM 键上电)。
+2.  **【必须步骤】初始化 DDR：** 必须先下载官方的 Loader 文件，才能进行后续的 Flash 写入。
+```bash
+# 这一步是关键！需要使用官方的 MiniLoaderAll.bin
+sudo rkdeveloptool db MiniLoaderAll.bin
+```
+3.  **烧录固件：**
+```bash
+sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
+```
 
-The variable store is not included in the flash image, in order to prevent overwriting it and to maintain the user settings across updates.
+### 2\. 运行状态变化的重要警告
 
-The firmware expects these exact offsets, do not change them.
+> **🚨 注意！状态锁定警告 🚨**
+> 一旦您成功刷入本 UEFI 固件后，**如果再次尝试通过软件命令 (`rkdeveloptool rd 3` 等) 进入 Loader 模式**，设备将不再进入 Loader 状态，而是直接回退到 **MaskROM 模式**。
+>
+> **这意味着：** 刷入 UEFI 后，如果您想再次使用 `rkdeveloptool` 刷写，**必须先通过硬件按键操作 (MaskROM 键/短接) 才能连接电脑。**
 
-## Memory Map
-| Address    | Size       | Desc                  | File                |
-| ---------- | ---------  | --------------------- | ------------------- |
-| 0x00040000 |            | ATF                   | bl31_0x00040000.bin |
-| 0x000f0000 |            | ATF                   | bl31_0x000f0000.bin |
-| 0x00200000 | 0x00500000 | UEFI FV               | BL33_AP_UEFI.Fv     |
-| 0x007C0000 | 0x00010000 | NV_VARIABLE_STORE     |                     |
-| 0x007D0000 | 0x00010000 | NV_FTW_WORKING        |                     |
-| 0x007E0000 | 0x00010000 | NV_FTW_SPARE          |                     |
-| 0x08400000 |            | OP-TEE                | bl32.bin            |
-| 0xff100000 |            | ATF (PMU_MEM)         | bl31_0xff100000.bin |
+### 3\. TF 卡烧录 (推荐)
 
-## Licenses
-Most of the UEFI code is licensed under the default EDK2 license, which is [BSD-2-Clause-Patent](https://github.com/tianocore/edk2/blob/master/License.txt).
+这是最安全的方法，不会影响板载 eMMC 里的系统。
 
-Some components ported from Linux and Rockchip's U-Boot fork are licensed as **GPL-2.0** (check `SPDX-License-Identifier`).
+1. **找到设备：** 确认你的 TF 卡在 Linux 下的设备名，例如 `/dev/sdb` (⚠️ **务必小心确认设备名**)。
+2.  **执行 DD 写入：**
+    ```bash
+    # 假设 TF 卡设备名为 /dev/sdb
+    sudo dd if=RK3588_NOR_FLASH.img of=/dev/sdb bs=1M status=progress conv=fsync
+    ```
 
-The license for some of the blobs in the `misc/rkbin/` directory can be found at: <https://github.com/rockchip-linux/rkbin/blob/master/LICENSE>. Note that it also contains binaries built from open-source projects such as U-Boot (SPL), Arm Trusted Firmware and OP-TEE, having a different license.
+### 4\. 启动流程
 
-## Community
-* Hack w/ Rockchip Telegram: <https://t.me/UEFIonRockchip>
-* Windows on R Discord: <https://discord.gg/vjHwptUCa3>
+1.  **连接串口：** 将 USB 转 TTL 串口线连接到 Debug Port (UART)。波特率设为 **`1500000`**。
+2.  **强制启动：**
+      * 插入烧录好的 TF 卡。
+      * **按住鲁班猫4上的 Recovery 键。**
+      * 插入 Type-C 供电。
+      * 保持 3-5 秒后松开 Recovery 键。
+3.  **观察日志：** 观察串口日志，看到 `UEFI firmware` 和 `Shell (F1)` 提示即为成功。
 
-## Credits & alternatives
-This firmware is based on Rockchip's initial efforts at <https://gitlab.com/rk3588_linux/rk/uefi-monorepo>.
+### 3\. 引导系统测试
 
-For RK356x, check out the Quartz64-UEFI project at https://github.com/jaredmcneill/quartz64_uefi, from which we also reused some code.
+*TODO...*
+
+-----
+
+## ✅ 验证状态与待办事项 (Status & TODOs)
+
+固件已成功启动并加载核心驱动，但以下功能尚未在操作系统环境下进行完整验证或仍存在已知问题：
+
+### 1\. 核心功能验证状态 (Functionality Status)
+
+| 功能模块 | 配置状态 | 实际验证状态 | 待办事项 / 备注 |
+| :--- | :--- | :--- | :--- |
+| **引导启动** | ✅ 启用 | 待测试 | 需连接 USB 启动盘 (Ubuntu/Win on ARM) 验证 OS 加载能力。|
+| **Ethernet** | ✅ 启用 | **待测试** | 驱动已加载，MAC 地址已获取，但未进行网络数据传输测试。|
+| **mini-PCIE** | ✅ 启用 | **待测试** | PCIe 链路已连接 (Link up)，但未测试 NVMe 或 Wi-Fi/4G 模块的枚举与使用。|
+| **USB 2.0/3.0** | ✅ 启用 | **待测试** | 仅验证了键盘输入和 U 盘枚举，需在 OS 中测试所有 Type-A 接口的稳定性。|
+| **GPIO (通用)** | ✅ 启用 | **待测试** | 40-Pin 扩展接口的通用 GPIO 功能尚未验证。|
+| **cpufreq** | ✅ 启用 | **待测试** | CPU 频率调节 (DVFS) 依赖 SCMI 协议，需要在 Linux/Windows 下确认频率切换是否正常。|
+
+### 2\. 硬件功能 (I/O & Multimedia)
+
+| 功能模块 | 配置状态 | 实际验证状态 | 待办事项 / 备注 |
+| :--- | :--- | :--- | :--- |
+| **HDMI/DP** | ✅ 启用 | **待测试** | UEFI 启动日志显示 `Not Found`。需要连接显示器并加载 GOP 驱动进行显示功能验证。|
+| **Type-C** | ✅ 启用 | **待测试** | DP 输出和 OTG 模式的切换功能尚未验证。|
+| **音频 (ES8388)** | ✅ 启用 | **待测试** | Codec 驱动已加载，I2C 通信正常，但音频输出/输入功能需在 OS 中测试。|
+| **Fan (PWM)** | ✅ 启用 | **待测试** | PWM 驱动已配置，需测试风扇是否能根据温度变化正常调速。|
+
+### 3\. 已知残留问题 (Known Issues)
+
+- **TFTP Assert：** 日志中可能出现 `ASSERT_EFI_ERROR (Status = Not Found)`，这是 TftpDynamicCommand 找不到网络连接所致，属于正常现象，不影响启动。
+- **FTW/NVRAM Corruption：** 首次启动时出现的 `Firmware Volume for Variable Store is corrupted` 错误是正常的，系统会自动修复。
+
+- **启动模式异常 (NEW):** 在刷入 UEFI 固件后，**使用按键方式**（Recovery键）试图进入 `Loader 模式`，现在会直接掉进 `MaskROM 模式`。
+> **分析：** 这表明 UEFI 固件可能修改了某些寄存器或引导配置，导致 Loader 无法正常初始化或运行，从而掉到最底层的 MaskROM 模式。
+> **注意：** 开发者在进行进一步的固件升级时，请预先做好进入 MaskROM 模式的准备。
+
+- **烧录失败 (NEW):** 在 Linux 环境下执行 `rkdeveloptool db` 时，可能会遇到以下报错并导致设备断开连接 (VID: 0x350b)：
+
+```text
+Creating Comm Object failed!
+```
+> **解决方案：** 这是 Linux 下 USB 通信不稳定的常见问题（尤其是虚拟机环境）。如果遇到此错误，请切换到 **Windows** 环境，使用官方的 **RKDevTool** 工具进行 Loader 初始化和固件烧写。
+
+*TODO...*
+
+-----
+
+## 📄 许可证与鸣谢 (License & Credits)
+
+本项目主要基于 `edk2-porting` 社区的 RK3588 移植成果。
+
+  * **EDK2 核心:** TianoCore, Linaro, ARM
+  * **许可证:** 本项目遵循 BSD-2-Clause 许可证。
+
+欢迎提出 Issue 或 Pull Request，共同完善鲁班猫4的 UEFI 固件！
