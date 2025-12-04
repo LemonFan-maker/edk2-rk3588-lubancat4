@@ -1,0 +1,18 @@
+/** @file
+*
+* Copyright (c) 2021, Rockchip Limited. All rights reserved.
+* Copyright (c) 2025, OrionisLi(CyanLi) <2254650260@qq.com>
+*
+* SPDX-License-Identifier: BSD-2-Clause-Patent
+*
+**/
+
+[Defines]
+  INF_VERSION                    = 0x0001001A
+  BASE_NAME                      = DeviceTree-Vendor
+  FILE_GUID                      = d58b4028-43d8-4e97-87d4-4e3716136580
+  MODULE_TYPE                    = USER_DEFINED
+  VERSION_STRING                 = 1.0
+
+[Binaries]
+  BIN|devicetree/vendor/rk3588s-lubancat-4.dtb
