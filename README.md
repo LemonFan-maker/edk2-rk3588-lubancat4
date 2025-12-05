@@ -171,10 +171,6 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
 - **TFTP Assert：** 日志中可能出现 `ASSERT_EFI_ERROR (Status = Not Found)`，这是 TftpDynamicCommand 找不到网络连接所致，属于正常现象，不影响启动。
 - **FTW/NVRAM Corruption：** 首次启动时出现的 `Firmware Volume for Variable Store is corrupted` 错误是正常的，系统会自动修复。
 
-- **启动模式异常 (NEW):** 在刷入 UEFI 固件后，**使用按键方式**（Recovery键）试图进入 `Loader 模式`，现在会直接掉进 `MaskROM 模式`。
-> **分析：** 这表明 UEFI 固件可能修改了某些寄存器或引导配置，导致 Loader 无法正常初始化或运行，从而掉到最底层的 MaskROM 模式。
-> **注意：** 开发者在进行进一步的固件升级时，请预先做好进入 MaskROM 模式的准备。
-
 - **烧录失败 (NEW):** 在 Linux 环境下执行 `rkdeveloptool db` 时，可能会遇到以下报错并导致设备断开连接 (VID: 0x350b)：
 
 ```text
