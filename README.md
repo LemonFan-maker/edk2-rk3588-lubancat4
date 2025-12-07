@@ -138,7 +138,7 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
 
 ### 5\. 引导系统测试
 
-1. 启动Ubuntu22.04 ARM64 Server 需要添加启动参数console=ttyS2 1500000n8 earlycon=uart8250,mmio32,0xfeb50000 acpi=force
+1. 启动Ubuntu22.04 ARM64 Server 需要修改参数，在grub界面，按`e`修改启动参数，将`---console...`改为`console=ttyS2 1500000n8 earlycon=uart8250,mmio32,0xfeb50000 acpi=force`
 
 -----
 
