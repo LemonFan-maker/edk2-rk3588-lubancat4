@@ -176,7 +176,7 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
 ```text
 Creating Comm Object failed!
 ```
-> **解决方案：** 这是 Linux 下 USB 通信不稳定的常见问题（尤其是虚拟机环境）。如果遇到此错误，请切换到 **Windows** 环境，使用官方的 **RKDevTool** 工具进行 Loader 初始化和固件烧写。
+> **解决方案：** 大概率是因为没有足够的权限操作usb节点，使用`sudo chmod 777 -R /dev/bus/usb`解决
 
 *TODO...*
 
