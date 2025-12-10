@@ -155,7 +155,7 @@ sudo rkdeveloptool wl 0 RK3588_NOR_FLASH.img
 | **mini-PCIE** | ✅ 启用 | ✅ | PCIe 链路已连接 (Link up)，测试了Wi-Fi网卡模块的使用。|
 | **USB 2.0/3.0** | ✅ 启用 | ✅ | 仅验证了键盘输入和 U 盘枚举，需在 OS 中测试所有 Type-A 接口的稳定性。|
 | **GPIO (通用)** | ✅ 启用 | **待测试** | 40-Pin 扩展接口的通用 GPIO 功能尚未验证。|
-| **cpufreq** | ✅ 启用 | ❌ | 虽然无法切换频率，但是CPU似乎已经保持在一个较高的频率下工作 |
+| **cpufreq** | ✅ 启用 | ✅ | policy0到policy6均可切换 |
 
 ### 2\. 硬件功能 (I/O & Multimedia)
 
