@@ -2,6 +2,8 @@
 
 这是野火鲁班猫4 (LubanCat 4) 开发板的 UEFI 固件移植项目，基于 `edk2-porting` 社区代码，旨在实现对标准 AArch64 操作系统 (如 Windows on ARM, Ubuntu Server) 的完美引导。
 
+**当然也仅限引导，主线内核目前不可用。**
+
 **项目状态:** 编译成功，启动并进入 UEFI Shell / BIOS Setup。
 
 -----
