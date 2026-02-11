@@ -104,7 +104,7 @@
   INF MdeModulePkg/Bus/I2c/I2cDxe/I2cDxe.inf
   INF Silicon/Rockchip/Drivers/I2c/I2cDxe/I2cDxe.inf
 !if $(RK_860X_REGULATOR_ENABLE) == TRUE
-  INF Silicon/Rockchip/Drivers/I2c/Rk860xRegulatorDxe/Rk860xRegulatorDxe.inf
+# INF Silicon/Rockchip/Drivers/I2c/Rk860xRegulatorDxe/Rk860xRegulatorDxe.inf
 !endif
 !if $(RK_RTC8563_ENABLE) == TRUE
   INF Silicon/Rockchip/Drivers/Rtc8563PlatformDxe/Rtc8563PlatformDxe.inf

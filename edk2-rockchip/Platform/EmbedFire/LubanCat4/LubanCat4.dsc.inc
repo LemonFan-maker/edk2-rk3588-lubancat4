@@ -36,9 +36,7 @@
 
 [LibraryClasses.common]
   RockchipPlatformLib|Platform/EmbedFire/LubanCat4/Library/RockchipPlatformLib/RockchipPlatformLib.inf
-
   Rk806Lib|Silicon/Rockchip/Library/SpiLib/RK806.inf
-  RK806Lib|Silicon/Rockchip/Library/SpiLib/RK806.inf
 
 ################################################################################
 #

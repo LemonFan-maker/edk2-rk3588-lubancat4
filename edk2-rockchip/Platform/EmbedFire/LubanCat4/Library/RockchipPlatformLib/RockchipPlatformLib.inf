@@ -31,7 +31,7 @@
   CruLib
   GpioLib
   PWMLib
-
+  TimerLib
   DebugLib                  # 用于 DEBUG ((...))
   UefiBootServicesTableLib  # 用于 gBS->Stall
   Rk806Lib                  # 用于 PMIC 初始化

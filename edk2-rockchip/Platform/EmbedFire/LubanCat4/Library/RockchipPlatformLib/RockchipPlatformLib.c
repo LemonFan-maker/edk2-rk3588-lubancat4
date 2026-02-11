@@ -17,6 +17,121 @@
 #include <Soc.h>
 #include <VarStoreData.h>
 #include <Library/UefiBootServicesTableLib.h>
+#include <Library/TimerLib.h>
+#include <Library/BaseLib.h> 
+
+#define I2C_BANK        0
+#define I2C_SCL_PIN     GPIO_PIN_PD4
+#define I2C_SDA_PIN     GPIO_PIN_PD5
+#define I2C_SPEED_KHZ   100
+#define I2C_HALF_DELAY  (500 / I2C_SPEED_KHZ)
+#define I2C_RETRY_CNT   3
+
+STATIC VOID SdaOut (BOOLEAN Level) {
+  if (Level) {
+    GpioPinSetDirection (I2C_BANK, I2C_SDA_PIN, GPIO_PIN_INPUT);
+  } else {
+    GpioPinWrite (I2C_BANK, I2C_SDA_PIN, FALSE);
+    GpioPinSetDirection (I2C_BANK, I2C_SDA_PIN, GPIO_PIN_OUTPUT);
+  }
+  MicroSecondDelay (I2C_HALF_DELAY);
+}
+
+STATIC VOID SclOut (BOOLEAN Level) {
+  if (Level) {
+    GpioPinSetDirection (I2C_BANK, I2C_SCL_PIN, GPIO_PIN_INPUT);
+  } else {
+    GpioPinWrite (I2C_BANK, I2C_SCL_PIN, FALSE);
+    GpioPinSetDirection (I2C_BANK, I2C_SCL_PIN, GPIO_PIN_OUTPUT);
+  }
+  MicroSecondDelay (I2C_HALF_DELAY);
+}
+
+STATIC VOID I2cStart (VOID) {
+  SdaOut(TRUE); SclOut(TRUE); SdaOut(FALSE); MicroSecondDelay(I2C_HALF_DELAY); SclOut(FALSE);
+}
+
+STATIC VOID I2cStop (VOID) {
+  SdaOut(FALSE); MicroSecondDelay(I2C_HALF_DELAY); SclOut(TRUE); MicroSecondDelay(I2C_HALF_DELAY); SdaOut(TRUE);
+}
+
+STATIC BOOLEAN I2cSendByte (UINT8 Data) {
+  UINT8 i;
+  BOOLEAN Ack;
+  for (i = 0; i < 8; i++) {
+    SdaOut((Data & 0x80) != 0);
+    SclOut(TRUE); SclOut(FALSE);
+    Data <<= 1;
+  }
+  SdaOut(TRUE);
+  MicroSecondDelay(I2C_HALF_DELAY);
+  SclOut(TRUE);
+  Ack = !GpioPinRead(I2C_BANK, I2C_SDA_PIN);
+  SclOut(FALSE);
+  SdaOut(TRUE);
+  return Ack;
+}
+
+STATIC EFI_STATUS Rk8602WriteReg (UINT8 Reg, UINT8 Val) {
+  UINTN Try;
+  BOOLEAN Ack;
+  for (Try = 0; Try < I2C_RETRY_CNT; Try++) {
+    I2cStart();
+    Ack = I2cSendByte(0x42 << 1); if (!Ack) { I2cStop(); continue; }
+    Ack = I2cSendByte(Reg);       if (!Ack) { I2cStop(); continue; }
+    Ack = I2cSendByte(Val);       I2cStop();
+    if (Ack) return EFI_SUCCESS;
+    MicroSecondDelay(200);
+  }
+  return EFI_DEVICE_ERROR;
+}
+
+EFI_STATUS SafeInitNpu (VOID) {
+  EFI_STATUS Status;
+
+  DEBUG ((DEBUG_INFO, "SafeInitNpu: Configuring NPU power (RK8602)...\n"));
+
+  // 1. 配置 GPIO 为模拟开漏，初始输入（防毛刺）
+  GpioPinSetFunction (I2C_BANK, I2C_SCL_PIN, 0);
+  GpioPinSetFunction (I2C_BANK, I2C_SDA_PIN, 0);
+  GpioPinSetDirection (I2C_BANK, I2C_SCL_PIN, GPIO_PIN_INPUT);
+  GpioPinSetDirection (I2C_BANK, I2C_SDA_PIN, GPIO_PIN_INPUT);
+  MicroSecondDelay(10);
+
+  // 2. 设置电压 0.8V
+  Status = Rk8602WriteReg(0x06, 0x30);
+  if (EFI_ERROR(Status)) {
+    DEBUG ((DEBUG_ERROR, "SafeInitNpu: Set voltage failed - %r\n", Status));
+    goto Exit;
+  }
+  DEBUG ((DEBUG_INFO, "SafeInitNpu: VOUT set to 0.8V\n"));
+  MicroSecondDelay(200);
+
+  // 3. 使能输出
+  Status = Rk8602WriteReg(0x05, 0x20);
+  if (EFI_ERROR(Status)) {
+    DEBUG ((DEBUG_ERROR, "SafeInitNpu: Enable output failed - %r\n", Status));
+    goto Exit;
+  }
+  DEBUG ((DEBUG_INFO, "SafeInitNpu: Output enabled\n"));
+  MicroSecondDelay(1000);
+
+Exit:
+  // 4. 释放 I2C 总线，切回 I2C 功能（供 Linux 使用）
+  GpioPinSetDirection (I2C_BANK, I2C_SCL_PIN, GPIO_PIN_OUTPUT);
+  GpioPinSetDirection (I2C_BANK, I2C_SDA_PIN, GPIO_PIN_OUTPUT);
+  GpioPinWrite (I2C_BANK, I2C_SCL_PIN, TRUE);
+  GpioPinWrite (I2C_BANK, I2C_SDA_PIN, TRUE);
+  MicroSecondDelay(5);
+  GpioPinSetFunction (I2C_BANK, I2C_SCL_PIN, 9);
+  GpioPinSetFunction (I2C_BANK, I2C_SDA_PIN, 9);
+
+  DEBUG ((DEBUG_INFO, "SafeInitNpu: %r\n", Status));
+
+  DEBUG ((DEBUG_INFO, "[NPU] SafeInitNpu finished, waiting 5 seconds...\n"));
+
+  return Status;
+}
 
 // --- PMIC 配置 (基于 LubanCat 4 DTS) ---
 static struct regulator_init_data  rk806_init_data[] = {
@@ -410,13 +525,50 @@ PlatformEarlyInit (
   VOID
   )
 {
+  EFI_STATUS Status;
+
+  DEBUG ((DEBUG_INFO, "[PLATFORM] PlatformEarlyInit started\n"));
+
   /* Audio Amp Enable */
-  // GPIO1_PA6 (Active High)
   GpioPinSetDirection (1, GPIO_PIN_PA6, GPIO_PIN_OUTPUT);
   GpioPinWrite (1, GPIO_PIN_PA6, TRUE);
 
-  /* 【NEW】 强制初始化风扇 */
-  // 这会根据 pwm_data 的设置（目前是 100% 转速）立即启动风扇
-  // 避免 CPU 在高负载下过热
+  /* 风扇初始化 */
   PwmFanIoSetup();
+
+  /* ========== NPU 电源初始化（RK8602）========== */
+  Status = SafeInitNpu();
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_ERROR, "FATAL: NPU power init failed - system halted.\n"));
+    CpuDeadLoop();
+  }
+
+  /* ========== NPU 时钟使能 ========== */
+  DEBUG ((DEBUG_INFO, "[NPU] Enabling NPU clocks...\n"));
+  // ！！！新增关键代码：开启 NPU 根时钟 (ROOT CLOCKS) ！！！
+  // HCLK_NPU_ROOT (Bit 0) + PCLK_NPU_ROOT (Bit 1) + ACLK_NPU_ROOT (Bit 2)
+  // 寄存器: CLKGATE_CON29 @ 0x874
+  // 缺少这个会导致寄存器读写失败 (0xffffffff)
+  MmioWrite32 (CRU_BASE + 0x874, (BIT(0) | BIT(1) | BIT(2)) << 16);
+
+  // ACLK_NPU0 + HCLK_NPU0 (CLKGATE_CON30 @ 0x878, bits 6 & 8)
+  MmioWrite32 (CRU_BASE + 0x878, (BIT(6) | BIT(8)) << 16);  // 写1清除门控（使能时钟）
+
+  // ACLK_NPU1 + HCLK_NPU1 (CLKGATE_CON27 @ 0x86C, bits 0 & 2)
+  MmioWrite32 (CRU_BASE + 0x86C, (BIT(0) | BIT(2)) << 16);
+
+  // ACLK_NPU2 + HCLK_NPU2 (CLKGATE_CON28 @ 0x870, bits 0 & 2)
+  MmioWrite32 (CRU_BASE + 0x870, (BIT(0) | BIT(2)) << 16);
+
+  MicroSecondDelay (10);
+
+  // ========== NPU 复位释放（带写掩码）==========
+  DEBUG ((DEBUG_INFO, "[NPU] Deasserting NPU resets...\n"));
+
+  // SOFTRST_CON30 @ 0x0A78, bits 6-11
+  MmioWrite32 (CRU_BASE + 0x0A78, (BIT(6) | BIT(7) | BIT(8) | BIT(9) | BIT(10) | BIT(11)) << 16);
+
+  MicroSecondDelay (100);
+
+  DEBUG ((DEBUG_INFO, "[PLATFORM] PlatformEarlyInit done\n"));
 }
