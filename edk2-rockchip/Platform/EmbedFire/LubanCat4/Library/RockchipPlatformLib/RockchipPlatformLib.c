@@ -18,7 +18,7 @@
 #include <VarStoreData.h>
 #include <Library/UefiBootServicesTableLib.h>
 #include <Library/TimerLib.h>
-#include <Library/BaseLib.h> 
+#include <Library/BaseLib.h>
 
 #define I2C_BANK        0
 #define I2C_SCL_PIN     GPIO_PIN_PD4
@@ -91,14 +91,14 @@ EFI_STATUS SafeInitNpu (VOID) {
 
   DEBUG ((DEBUG_INFO, "SafeInitNpu: Configuring NPU power (RK8602)...\n"));
 
-  // 1. 配置 GPIO 为模拟开漏，初始输入（防毛刺）
+  /* Configure GPIO as open-drain, initially input. */
   GpioPinSetFunction (I2C_BANK, I2C_SCL_PIN, 0);
   GpioPinSetFunction (I2C_BANK, I2C_SDA_PIN, 0);
   GpioPinSetDirection (I2C_BANK, I2C_SCL_PIN, GPIO_PIN_INPUT);
   GpioPinSetDirection (I2C_BANK, I2C_SDA_PIN, GPIO_PIN_INPUT);
   MicroSecondDelay(10);
 
-  // 2. 设置电压 0.8V
+  /* Set voltage to 0.8V. */
   Status = Rk8602WriteReg(0x06, 0x30);
   if (EFI_ERROR(Status)) {
     DEBUG ((DEBUG_ERROR, "SafeInitNpu: Set voltage failed - %r\n", Status));
@@ -107,7 +107,7 @@ EFI_STATUS SafeInitNpu (VOID) {
   DEBUG ((DEBUG_INFO, "SafeInitNpu: VOUT set to 0.8V\n"));
   MicroSecondDelay(200);
 
-  // 3. 使能输出
+  /* Enable output. */
   Status = Rk8602WriteReg(0x05, 0x20);
   if (EFI_ERROR(Status)) {
     DEBUG ((DEBUG_ERROR, "SafeInitNpu: Enable output failed - %r\n", Status));
@@ -117,7 +117,7 @@ EFI_STATUS SafeInitNpu (VOID) {
   MicroSecondDelay(1000);
 
 Exit:
-  // 4. 释放 I2C 总线，切回 I2C 功能（供 Linux 使用）
+  /* Release I2C bus, switch back to I2C function. */
   GpioPinSetDirection (I2C_BANK, I2C_SCL_PIN, GPIO_PIN_OUTPUT);
   GpioPinSetDirection (I2C_BANK, I2C_SDA_PIN, GPIO_PIN_OUTPUT);
   GpioPinWrite (I2C_BANK, I2C_SCL_PIN, TRUE);
@@ -133,48 +133,48 @@ Exit:
   return Status;
 }
 
-// --- PMIC 配置 (基于 LubanCat 4 DTS) ---
+/* PMIC configuration */
 static struct regulator_init_data  rk806_init_data[] = {
-  /* Master PMIC - Voltage Rails verified against DTS */
-  
-  /* BUCK1 (vdd_gpu_s0): DTS 550-950mV -> Set 750mV Safe */
+  /* Master PMIC - Voltage Rails verified against DTS. */
+
+  /* BUCK1 (vdd_gpu_s0): DTS range 550-950mV -> Set 750mV. */
   RK8XX_VOLTAGE_INIT (MASTER_BUCK1,  750000),
-  
-  /* BUCK3 (vdd_log_s0): DTS 675-800mV -> Set 750mV */
+
+  /* BUCK3 (vdd_log_s0): DTS range 675-800mV -> Set 750mV. */
   RK8XX_VOLTAGE_INIT (MASTER_BUCK3,  750000),
-  
-  /* BUCK4 (vdd_vdenc_s0): DTS Init 750mV -> Set 750mV */
+
+  /* BUCK4 (vdd_vdenc_s0): DTS init 750mV -> Set 750mV. */
   RK8XX_VOLTAGE_INIT (MASTER_BUCK4,  750000),
-  
-  /* BUCK5 (vdd_ddr_s0): DTS 675-900mV -> Set 850mV */
+
+  /* BUCK5 (vdd_ddr_s0): DTS range 675-900mV -> Set 850mV. */
   RK8XX_VOLTAGE_INIT (MASTER_BUCK5,  850000),
-  
-  /* BUCK6 (vdd2_ddr_s3): No voltage in DTS (Fixed/Slave) -> Skip */
-  // RK8XX_VOLTAGE_INIT(MASTER_BUCK6, 750000),
-  
-  /* BUCK7 (vcc_2v0_pldo_s3): DTS Fixed 2000mV -> Set 2000mV */
+
+  /* BUCK6 (vdd2_ddr_s3): No voltage in DTS -> Skip. */
+  /* RK8XX_VOLTAGE_INIT(MASTER_BUCK6, 750000), */
+
+  /* BUCK7 (vcc_2v0_pldo_s3): DTS Fixed 2000mV -> Set 2000mV. */
   RK8XX_VOLTAGE_INIT (MASTER_BUCK7,  2000000),
-  
-  /* BUCK8 (vcc_3v3_s3): DTS Fixed 3300mV -> Set 3300mV */
+
+  /* BUCK8 (vcc_3v3_s3): DTS Fixed 3300mV -> Set 3300mV. */
   RK8XX_VOLTAGE_INIT (MASTER_BUCK8,  3300000),
-  
-  /* BUCK10 (vcc_1v8_s3): DTS Fixed 1800mV -> Set 1800mV */
+
+  /* BUCK10 (vcc_1v8_s3): DTS Fixed 1800mV -> Set 1800mV. */
   RK8XX_VOLTAGE_INIT (MASTER_BUCK10, 1800000),
 
-  /* PLDO1 (vcc_1v8_s0): DTS Fixed 1800mV -> Set 1800mV */
-  RK8XX_VOLTAGE_INIT (MASTER_NLDO1,  750000), // 注意：EDK2 宏定义命名可能偏移，此处对应 NLDO1 (vdd_0v75_s3) 750mV
-  RK8XX_VOLTAGE_INIT (MASTER_NLDO2,  850000), // NLDO2 (avdd_ddr_pll_s0) 850mV
-  RK8XX_VOLTAGE_INIT (MASTER_NLDO3,  750000), // NLDO3 (avdd_0v75_s0) 750mV
-  RK8XX_VOLTAGE_INIT (MASTER_NLDO4,  850000), // NLDO4 (avdd_0v85_s0) 850mV
-  // RK8XX_VOLTAGE_INIT (MASTER_NLDO5,  750000), // DTS 中不存在 NLDO5，直接移除
+  /* PLDO1 (vcc_1v8_s0): DTS Fixed 1800mV -> Set 1800mV. */
+  RK8XX_VOLTAGE_INIT (MASTER_NLDO1,  750000),
+  RK8XX_VOLTAGE_INIT (MASTER_NLDO2,  850000),   /* NLDO2 (avdd_ddr_pll_s0) 850mV. */
+  RK8XX_VOLTAGE_INIT (MASTER_NLDO3,  750000),   /* NLDO3 (avdd_0v75_s0) 750mV. */
+  RK8XX_VOLTAGE_INIT (MASTER_NLDO4,  850000),   /* NLDO4 (avdd_0v85_s0) 850mV. */
+  /* NLDO5 does not exist in DTS, removed. */
 
   /* PLDO Configuration */
-  RK8XX_VOLTAGE_INIT (MASTER_PLDO1,  1800000), // vcc_1v8_s0
-  RK8XX_VOLTAGE_INIT (MASTER_PLDO2,  1800000), // avcc_1v8_s0
-  RK8XX_VOLTAGE_INIT (MASTER_PLDO3,  1200000), // avdd_1v2_s0 (1.2V Verified)
-  RK8XX_VOLTAGE_INIT (MASTER_PLDO4,  3300000), // avcc_3v3_s0
-  RK8XX_VOLTAGE_INIT (MASTER_PLDO5,  3300000), // vccio_sd_s0 (Start at 3.3V for SD)
-  RK8XX_VOLTAGE_INIT (MASTER_PLDO6,  1800000), // pldo6_s3
+  RK8XX_VOLTAGE_INIT (MASTER_PLDO1,  1800000),  /* vcc_1v8_s0 */
+  RK8XX_VOLTAGE_INIT (MASTER_PLDO2,  1800000),  /* avcc_1v8_s0 */
+  RK8XX_VOLTAGE_INIT (MASTER_PLDO3,  1200000),  /* avdd_1v2_s0 */
+  RK8XX_VOLTAGE_INIT (MASTER_PLDO4,  3300000),  /* avcc_3v3_s0 */
+  RK8XX_VOLTAGE_INIT (MASTER_PLDO5,  3300000),  /* vccio_sd_s0 (Start at 3.3V for SD) */
+  RK8XX_VOLTAGE_INIT (MASTER_PLDO6,  1800000),  /* pldo6_s3 */
 };
 
 VOID
@@ -184,9 +184,9 @@ SdmmcIoMux (
   )
 {
   /* TF Card IOMUX - Standard RK3588 */
-  BUS_IOC->GPIO4D_IOMUX_SEL_L  = (0xFFFFUL << 16) | (0x1111); // D0-D3
-  BUS_IOC->GPIO4D_IOMUX_SEL_H  = (0x00FFUL << 16) | (0x0011); // CLK, CMD
-  PMU1_IOC->GPIO0A_IOMUX_SEL_H = (0x000FUL << 16) | (0x0001); // DET
+  BUS_IOC->GPIO4D_IOMUX_SEL_L  = (0xFFFFUL << 16) | (0x1111); /* D0-D3 */
+  BUS_IOC->GPIO4D_IOMUX_SEL_H  = (0x00FFUL << 16) | (0x0011); /* CLK, CMD */
+  PMU1_IOC->GPIO0A_IOMUX_SEL_H = (0x000FUL << 16) | (0x0001); /* DET */
 }
 
 VOID
@@ -228,7 +228,7 @@ Rk806Configure (
 {
   UINTN  RegCfgIndex;
   RK806Init ();
-  RK806PinSetFunction (MASTER, 1, 2); 
+  RK806PinSetFunction (MASTER, 1, 2);
   for (RegCfgIndex = 0; RegCfgIndex < ARRAY_SIZE (rk806_init_data); RegCfgIndex++) {
     RK806RegulatorInit (rk806_init_data[RegCfgIndex]);
   }
@@ -252,10 +252,10 @@ NorFspiIomux (
   VOID
   )
 {
-  /* FSPI Init - Safe defaults for RK3588 */
+  /* FSPI Init */
   MmioWrite32 (NS_CRU_BASE + CRU_CLKSEL_CON78,
     (((0x3 << 12) | (0x3f << 6)) << 16) | (0x0 << 12) | (0x3f << 6));
-  
+
   /* FSPI M1 */
   BUS_IOC->GPIO2A_IOMUX_SEL_H = (0xFF00UL << 16) | (0x3300);
   BUS_IOC->GPIO2B_IOMUX_SEL_L = (0xF0FFUL << 16) | (0x3033);
@@ -325,16 +325,16 @@ I2cIomux (
       GpioPinSetFunction (0, GPIO_PIN_PD1, 3);
       GpioPinSetFunction (0, GPIO_PIN_PD2, 3);
       break;
-    
-    /* case 6: REMOVED. 
+
+    /* case 6: REMOVED.
        DTS confirmed NO I2C6.
        Pins Reserved for PWM0_M2 (Fan). 
     */
 
-    case 7: 
-      /* ES8388 Audio Codec (I2C7 M0) Verified */
-      GpioPinSetFunction (1, GPIO_PIN_PD0, 9); // SCL
-      GpioPinSetFunction (1, GPIO_PIN_PD1, 9); // SDA
+    case 7:
+      /* ES8388 Audio Codec (I2C7 M0) */
+      GpioPinSetFunction (1, GPIO_PIN_PD0, 9); /* SCL */
+      GpioPinSetFunction (1, GPIO_PIN_PD1, 9); /* SDA */
       break;
     default:
       break;
@@ -354,15 +354,15 @@ UsbPortPowerEnable (
    * USB 2.0 Host: GPIO1_PC6 (Active High)
    */
 
-  // 1. Enable USB 3.0 Host Power
+  /* 1. Enable USB 3.0 Host Power */
   GpioPinSetDirection (1, GPIO_PIN_PC4, GPIO_PIN_OUTPUT);
   GpioPinWrite (1, GPIO_PIN_PC4, TRUE);
 
-  // 2. Enable USB 2.0 Host Power
+  /* 2. Enable USB 2.0 Host Power */
   GpioPinSetDirection (1, GPIO_PIN_PC6, GPIO_PIN_OUTPUT);
   GpioPinWrite (1, GPIO_PIN_PC6, TRUE);
 
-  gBS->Stall (50000); 
+  gBS->Stall (50000);
 }
 
 VOID
@@ -389,7 +389,7 @@ PcieIoInit (
   if (Segment == PCIE_SEGMENT_PCIE20L2) {
     /* Reset: GPIO3_PD1 */
     GpioPinSetDirection (3, GPIO_PIN_PD1, GPIO_PIN_OUTPUT);
-    
+
     /* Disable: GPIO3_PC6 (Set LOW to Enable) */
     GpioPinSetDirection (3, GPIO_PIN_PC6, GPIO_PIN_OUTPUT);
     GpioPinWrite (3, GPIO_PIN_PC6, FALSE);
@@ -433,24 +433,24 @@ HdmiTxIomux (
 {
   switch (Id) {
     case 0:
-      GpioPinSetFunction (4, GPIO_PIN_PC1, 5); // hdmim0_tx0_cec
+      GpioPinSetFunction (4, GPIO_PIN_PC1, 5); /* hdmim0_tx0_cec */
       GpioPinSetPull (4, GPIO_PIN_PC1, GPIO_PIN_PULL_NONE);
-      GpioPinSetFunction (1, GPIO_PIN_PA5, 5); // hdmim0_tx0_hpd
+      GpioPinSetFunction (1, GPIO_PIN_PA5, 5); /* hdmim0_tx0_hpd */
       GpioPinSetPull (1, GPIO_PIN_PA5, GPIO_PIN_PULL_NONE);
-      GpioPinSetFunction (4, GPIO_PIN_PB7, 5); // hdmim0_tx0_scl
+      GpioPinSetFunction (4, GPIO_PIN_PB7, 5); /* hdmim0_tx0_scl */
       GpioPinSetPull (4, GPIO_PIN_PB7, GPIO_PIN_PULL_NONE);
-      GpioPinSetFunction (4, GPIO_PIN_PC0, 5); // hdmim0_tx0_sda
+      GpioPinSetFunction (4, GPIO_PIN_PC0, 5); /* hdmim0_tx0_sda */
       GpioPinSetPull (4, GPIO_PIN_PC0, GPIO_PIN_PULL_NONE);
       break;
   }
 }
 
-// --- Fan Configuration ---
+/* Fan Configuration */
 PWM_DATA  pwm_data = {
-  .ControllerID = PWM_CONTROLLER0, // DTS: pwm0
-  .ChannelID    = PWM_CHANNEL0,    // Channel 0
+  .ControllerID = PWM_CONTROLLER0, /* DTS: pwm0 */
+  .ChannelID    = PWM_CHANNEL0,    /* Channel 0 */
   .PeriodNs     = 5000,
-  .DutyNs       = 1000, // 20% Duty Cycle
+  .DutyNs       = 1000,            /* 20% Duty Cycle */
   .Polarity     = FALSE,
 };
 
@@ -464,8 +464,8 @@ PwmFanIoSetup (
    * DTS: pinctrl-0 = <&pwm0m2_pins>
    * Map: PWM0_M2 -> GPIO1_PA2
    */
-  GpioPinSetFunction (1, GPIO_PIN_PA2, 11);  
-  
+  GpioPinSetFunction (1, GPIO_PIN_PA2, 11);
+
   RkPwmSetConfig (&pwm_data);
   RkPwmEnable (&pwm_data);
 }
@@ -486,9 +486,9 @@ PlatformInitLeds (
   VOID
   )
 {
-  /* Sys LED: GPIO4_PB5 (Active Low)*/
+  /* Sys LED: GPIO4_PB5 (Active Low) */
   GpioPinSetDirection (4, GPIO_PIN_PB5, GPIO_PIN_OUTPUT);
-  GpioPinWrite (4, GPIO_PIN_PB5, FALSE); // Turn ON (Low)
+  GpioPinWrite (4, GPIO_PIN_PB5, FALSE); /* Turn ON (Low) */
 }
 
 VOID
@@ -507,7 +507,7 @@ PlatformGetDtbFileGuid (
   )
 {
   STATIC CONST EFI_GUID  VendorDtbFileGuid = {
-    // DeviceTree/Vendor.inf
+    /* DeviceTree/Vendor.inf */
     0xd58b4028, 0x43d8, 0x4e97, { 0x87, 0xd4, 0x4e, 0x37, 0x16, 0x13, 0x65, 0x80 }
   };
 
@@ -533,39 +533,36 @@ PlatformEarlyInit (
   GpioPinSetDirection (1, GPIO_PIN_PA6, GPIO_PIN_OUTPUT);
   GpioPinWrite (1, GPIO_PIN_PA6, TRUE);
 
-  /* 风扇初始化 */
+  /* Fan initialization */
   PwmFanIoSetup();
 
-  /* ========== NPU 电源初始化（RK8602）========== */
   Status = SafeInitNpu();
   if (EFI_ERROR (Status)) {
     DEBUG ((DEBUG_ERROR, "FATAL: NPU power init failed - system halted.\n"));
     CpuDeadLoop();
   }
 
-  /* ========== NPU 时钟使能 ========== */
+  /* NPU clock enable */
   DEBUG ((DEBUG_INFO, "[NPU] Enabling NPU clocks...\n"));
-  // ！！！新增关键代码：开启 NPU 根时钟 (ROOT CLOCKS) ！！！
-  // HCLK_NPU_ROOT (Bit 0) + PCLK_NPU_ROOT (Bit 1) + ACLK_NPU_ROOT (Bit 2)
-  // 寄存器: CLKGATE_CON29 @ 0x874
-  // 缺少这个会导致寄存器读写失败 (0xffffffff)
+
+  /* HCLK_NPU_ROOT (Bit 0) + PCLK_NPU_ROOT (Bit 1) + ACLK_NPU_ROOT (Bit 2) */
   MmioWrite32 (CRU_BASE + 0x874, (BIT(0) | BIT(1) | BIT(2)) << 16);
 
-  // ACLK_NPU0 + HCLK_NPU0 (CLKGATE_CON30 @ 0x878, bits 6 & 8)
-  MmioWrite32 (CRU_BASE + 0x878, (BIT(6) | BIT(8)) << 16);  // 写1清除门控（使能时钟）
+  /* ACLK_NPU0 + HCLK_NPU0 (CLKGATE_CON30 @ 0x878, bits 6 & 8) */
+  MmioWrite32 (CRU_BASE + 0x878, (BIT(6) | BIT(8)) << 16);  /* Write 1 to clear gate (enable clock) */
 
-  // ACLK_NPU1 + HCLK_NPU1 (CLKGATE_CON27 @ 0x86C, bits 0 & 2)
+  /* ACLK_NPU1 + HCLK_NPU1 (CLKGATE_CON27 @ 0x86C, bits 0 & 2) */
   MmioWrite32 (CRU_BASE + 0x86C, (BIT(0) | BIT(2)) << 16);
 
-  // ACLK_NPU2 + HCLK_NPU2 (CLKGATE_CON28 @ 0x870, bits 0 & 2)
+  /* ACLK_NPU2 + HCLK_NPU2 (CLKGATE_CON28 @ 0x870, bits 0 & 2) */
   MmioWrite32 (CRU_BASE + 0x870, (BIT(0) | BIT(2)) << 16);
 
   MicroSecondDelay (10);
 
-  // ========== NPU 复位释放（带写掩码）==========
+  /* NPU reset release */
   DEBUG ((DEBUG_INFO, "[NPU] Deasserting NPU resets...\n"));
 
-  // SOFTRST_CON30 @ 0x0A78, bits 6-11
+  /* SOFTRST_CON30 @ 0x0A78, bits 6-11 */
   MmioWrite32 (CRU_BASE + 0x0A78, (BIT(6) | BIT(7) | BIT(8) | BIT(9) | BIT(10) | BIT(11)) << 16);
 
   MicroSecondDelay (100);
