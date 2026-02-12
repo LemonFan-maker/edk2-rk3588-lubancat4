@@ -89,7 +89,7 @@ STATIC EFI_STATUS Rk8602WriteReg (UINT8 Reg, UINT8 Val) {
 EFI_STATUS SafeInitNpu (VOID) {
   EFI_STATUS Status;
 
-  DEBUG ((DEBUG_INFO, "SafeInitNpu: Configuring NPU power (RK8602)...\n"));
+  DEBUG ((DEBUG_INFO, "SafeInitNpu: Configuring NPU power\n"));
 
   /* Configure GPIO as open-drain, initially input. */
   GpioPinSetFunction (I2C_BANK, I2C_SCL_PIN, 0);
@@ -128,7 +128,7 @@ Exit:
 
   DEBUG ((DEBUG_INFO, "SafeInitNpu: %r\n", Status));
 
-  DEBUG ((DEBUG_INFO, "[NPU] SafeInitNpu finished, waiting 5 seconds...\n"));
+  DEBUG ((DEBUG_INFO, "[NPU] SafeInitNpu finished\n"));
 
   return Status;
 }
@@ -568,4 +568,5 @@ PlatformEarlyInit (
   MicroSecondDelay (100);
 
   DEBUG ((DEBUG_INFO, "[PLATFORM] PlatformEarlyInit done\n"));
+
 }
