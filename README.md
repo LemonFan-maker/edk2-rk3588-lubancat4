@@ -6,6 +6,8 @@
 
 **项目状态:** 编译成功，启动并进入 UEFI Shell / BIOS Setup。
 
+**请不要尝试使用这个项目引导启动Windows系统，因为驱动问题导致无法识别到EMMC，或者是inaccessible_boot_device**
+
 -----
 
 ## ✨ 核心特性与适配情况
