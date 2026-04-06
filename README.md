@@ -25,6 +25,8 @@
 
 -----
 
+**详细的部署流程请参考文章[给鲁班猫 4 移植一个 UEFI 进来有多享受](https://posts.orionisli.cn/2025/12/16/RK3588S移植UEFI实战指北/)**
+
 ## 🛠️ 编译环境准备 (Build Prerequisites)
 
 你需要一个支持 AArch64 交叉编译的 Linux 环境 (推荐 Ubuntu 20.04/22.04)。
