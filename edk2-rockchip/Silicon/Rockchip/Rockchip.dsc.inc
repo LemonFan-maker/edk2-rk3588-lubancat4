@@ -352,8 +352,7 @@ FspiLib|Silicon/Rockchip/Library/FspiLib/FspiLib.inf
 ###################################################################################################
 
 [BuildOptions]
-  GCC:*_*_AARCH64_CC_FLAGS  = -Wno-error=unused-function
-
+  GCC:*_*_AARCH64_CC_FLAGS  = -Wno-error=unused-function -std=gnu17
   # Compile with symbols to support overlays.
   *_*_*_DTC_FLAGS = -@
 

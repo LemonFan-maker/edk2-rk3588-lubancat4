@@ -126,7 +126,7 @@ function _build(){
             DEBUG=0
         fi
 
-        make PLAT=${TFA_PLAT} DEBUG=${DEBUG} all ${TFA_FLAGS}
+        make PLAT=${TFA_PLAT} DEBUG=${DEBUG} all CFLAGS="-Wno-error=unterminated-string-initialization" ${TFA_FLAGS}
 
         popd
     fi
@@ -140,7 +140,7 @@ function _build(){
     export CLANG38_AARCH64_PREFIX="${CROSS_COMPILE}"
     export PACKAGES_PATH="${ROOTDIR}/edk2:${ROOTDIR}/edk2-rockchip:${ROOTDIR}/devicetree:${ROOTDIR}/edk2-non-osi:${ROOTDIR}/edk2-platforms:${ROOTDIR}"
 
-    make -C "${ROOTDIR}/edk2/BaseTools"
+    make -C "${ROOTDIR}/edk2/BaseTools" EXTRA_OPTFLAGS="-std=gnu17 -Wno-error=unused-but-set-variable"
     source "${ROOTDIR}/edk2/edksetup.sh"
 
     build \

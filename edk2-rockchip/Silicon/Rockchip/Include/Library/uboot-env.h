@@ -21,11 +21,12 @@ typedef unsigned int uint;
 typedef UINTN ulong;
 typedef INTN ssize_t;
 typedef UINTN size_t;
+#if !defined(__bool_true_false_are_defined) && (!defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L)
 typedef BOOLEAN bool;
-typedef UINT16 __be16;
-
 #define true TRUE
 #define false FALSE
+#endif
+typedef UINT16 __be16;
 
 #define udelay(x)	MicroSecondDelay (x)
 #define mdelay(x) 	MicroSecondDelay (x * 1000)
