@@ -2,6 +2,7 @@
 *
 * Copyright (c) 2021, Rockchip Limited. All rights reserved.
 * Copyright (c) 2025, OrionisLi(CyanLi) <2254650260@qq.com>
+* Copyright (c) 2026, OrionisLi <cyan2254650260@gmail.com>
 *
 * SPDX-License-Identifier: BSD-2-Clause-Patent
 *
@@ -199,6 +200,14 @@ SdhciEmmcIoMux (
   BUS_IOC->GPIO2A_IOMUX_SEL_L = (0xFFFFUL << 16) | (0x1111);
   BUS_IOC->GPIO2D_IOMUX_SEL_L = (0xFFFFUL << 16) | (0x1111);
   BUS_IOC->GPIO2D_IOMUX_SEL_H = (0xFFFFUL << 16) | (0x1111);
+
+  /*
+   * Do NOT add eMMC pinconf here.  The vendor FDT's mmc@fe2e0000 node has no
+   * pinctrl-0, so Linux inherits whatever pin state the firmware leaves.
+   * Overriding drive/pull on emmc_cmd and emmc_data_strobe caused an
+   * "SError Interrupt ... pc : cqhci_request" panic under HS400 Enhanced
+   * Strobe at 200 MHz.  eMMC already reaches HS400 with the pre-boot values.
+   */
 }
 
 #define NS_CRU_BASE       0xFD7C0000
