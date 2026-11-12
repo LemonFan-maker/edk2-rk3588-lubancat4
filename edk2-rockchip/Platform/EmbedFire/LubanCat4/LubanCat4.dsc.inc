@@ -148,6 +148,7 @@
   # Device Tree Support
 
   Platform/EmbedFire/LubanCat4/DeviceTree/Vendor.inf
+  Platform/EmbedFire/LubanCat4/DeviceTree/Mainline.inf
 
   # Splash screen logo
   

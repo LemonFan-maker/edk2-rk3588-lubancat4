@@ -16,6 +16,7 @@
   # Device Tree Support
 
   INF RuleOverride = DTB Platform/EmbedFire/LubanCat4/DeviceTree/Vendor.inf
+  INF RuleOverride = DTB Platform/EmbedFire/LubanCat4/DeviceTree/Mainline.inf
 
   # Splash screen logo
 
