@@ -211,8 +211,14 @@ SdhciEmmcIoMux (
 }
 
 #define NS_CRU_BASE       0xFD7C0000
+#define PMU1_CRU_BASE     0xFD7F0000
+#define CRU_CLKSEL_CON41  0x03A4
 #define CRU_CLKSEL_CON59  0x03EC
 #define CRU_CLKSEL_CON78  0x0438
+#define CRU_CLKGATE_CON12 0x0830
+#define CRU_SOFTRST_CON12 0x0A30
+#define PMU1_CRU_CLKSEL_CON2   0x0308
+#define PMU1_CRU_CLKGATE_CON1  0x0804
 
 VOID
 EFIAPI
@@ -469,11 +475,28 @@ PwmFanIoSetup (
   VOID
   )
 {
+  /*
+   * pwm0 uses CLK_PMU1PWM and PCLK_PMU1PWM on RK3588S.  PWMLib converts
+   * nanoseconds to cycles assuming a 24 MHz source, so select xin24m and
+   * explicitly ungate both clocks before touching the controller.
+   */
+  MmioWrite32 (
+    PMU1_CRU_BASE + PMU1_CRU_CLKSEL_CON2,
+    ((BIT9 | BIT10) << 16) | BIT10
+    );
+  MmioWrite32 (
+    PMU1_CRU_BASE + PMU1_CRU_CLKGATE_CON1,
+    (BIT12 | BIT13) << 16
+    );
+
   /* Fan PinMux:
    * DTS: pinctrl-0 = <&pwm0m2_pins>
    * Map: PWM0_M2 -> GPIO1_PA2
    */
   GpioPinSetFunction (1, GPIO_PIN_PA2, 11);
+
+  /* RK3588S PWM0 pin electrical configuration. */
+  GpioPinSetPull (1, GPIO_PIN_PA2, GPIO_PIN_PULL_NONE);
 
   RkPwmSetConfig (&pwm_data);
   RkPwmEnable (&pwm_data);
@@ -487,6 +510,91 @@ PwmFanSetSpeed (
 {
   pwm_data.DutyNs = pwm_data.PeriodNs * Percentage / 100;
   RkPwmSetConfig (&pwm_data);
+}
+
+#define TSADC_BASE                    0xFEC00000
+#define TSADC_AUTO_CON                0x0004
+#define TSADC_AUTO_SRC_CON            0x000C
+#define TSADC_HSHUT_GPIO_INT_EN       0x0018
+#define TSADC_HSHUT_CRU_INT_EN        0x001C
+#define TSADC_DATA0                   0x002C
+#define TSADC_COMP_SHUT(Channel)      (0x010C + ((Channel) * sizeof (UINT32)))
+#define TSADC_HIGHT_INT_DEBOUNCE      0x014C
+#define TSADC_HIGHT_TSHUT_DEBOUNCE    0x0150
+#define TSADC_AUTO_PERIOD             0x0154
+#define TSADC_AUTO_PERIOD_HT          0x0158
+
+#define TSADC_CHANNEL_COUNT           7
+#define TSADC_TSHUT_120C_CODE         389
+#define TSADC_AUTO_PERIOD_2_5MS       5000
+
+/* TSADC auto-conversion setup for RK3588/RK3588S.  The sequence mirrors
+ * Linux v6.6 rockchip_thermal_probe(), rk_tsadcv8_initialize(),
+ * rk_tsadcv3_tshut_temp()/mode(), and rk_tsadcv4_control().
+ */
+STATIC
+VOID
+TsadcInit (
+  VOID
+  )
+{
+  UINT32  Channel;
+  UINT32  ChannelEnable;
+  UINT32  ChannelMask;
+  UINT32  ChannelWriteMask;
+
+  /* CLK_TSADC = xin24m / 12 = 2 MHz (mux bit 8, divider bits 7:0). */
+  MmioWrite32 (
+    NS_CRU_BASE + CRU_CLKSEL_CON41,
+    (0x01FFUL << 16) | BIT8 | 11
+    );
+
+  /* Ungate PCLK_TSADC and CLK_TSADC, then reset both APB and TSADC logic. */
+  MmioWrite32 (
+    NS_CRU_BASE + CRU_CLKGATE_CON12,
+    (BIT0 | BIT1) << 16
+    );
+  MmioWrite32 (
+    NS_CRU_BASE + CRU_SOFTRST_CON12,
+    ((BIT0 | BIT1) << 16) | BIT0 | BIT1
+    );
+  MicroSecondDelay (10);
+  MmioWrite32 (
+    NS_CRU_BASE + CRU_SOFTRST_CON12,
+    (BIT0 | BIT1) << 16
+    );
+
+  MmioWrite32 (TSADC_BASE + TSADC_AUTO_PERIOD,
+               TSADC_AUTO_PERIOD_2_5MS);
+  MmioWrite32 (TSADC_BASE + TSADC_AUTO_PERIOD_HT,
+               TSADC_AUTO_PERIOD_2_5MS);
+  MmioWrite32 (TSADC_BASE + TSADC_HIGHT_INT_DEBOUNCE, 4);
+  MmioWrite32 (TSADC_BASE + TSADC_HIGHT_TSHUT_DEBOUNCE, 4);
+
+  /* AUTO_CON uses Rockchip's high-word write mask: clear polarity bit 8. */
+  MmioWrite32 (TSADC_BASE + TSADC_AUTO_CON, BIT24);
+
+  /* Match the RK3588S DTS: all seven sensors shut down through CRU at 120 C.
+   * Program each safe comparator before enabling its conversion source.
+   */
+  for (Channel = 0; Channel < TSADC_CHANNEL_COUNT; Channel++) {
+    ChannelMask      = 1U << Channel;
+    ChannelWriteMask = 1U << (16 + Channel);
+    ChannelEnable    = ChannelMask | ChannelWriteMask;
+    MmioWrite32 (TSADC_BASE + TSADC_HSHUT_GPIO_INT_EN,
+                 ChannelWriteMask);
+    MmioWrite32 (TSADC_BASE + TSADC_HSHUT_CRU_INT_EN, ChannelEnable);
+    MmioWrite32 (TSADC_BASE + TSADC_COMP_SHUT (Channel),
+                 TSADC_TSHUT_120C_CODE);
+    MmioWrite32 (TSADC_BASE + TSADC_AUTO_SRC_CON, ChannelEnable);
+  }
+
+  /* Enable continuous auto conversion (also a high-word masked register). */
+  MmioWrite32 (TSADC_BASE + TSADC_AUTO_CON, BIT16 | BIT0);
+
+  MicroSecondDelay (20000);
+  DEBUG ((DEBUG_INFO, "[TSADC] DATA0=%u (expect ~285 at 25C)\n",
+          MmioRead32 (TSADC_BASE + TSADC_DATA0) & 0x1FF));
 }
 
 VOID
@@ -544,6 +652,9 @@ PlatformEarlyInit (
 
   /* Fan initialization */
   PwmFanIoSetup();
+
+  /* Start TSADC for the ACPI fan thermal zone. */
+  TsadcInit();
 
   Status = SafeInitNpu();
   if (EFI_ERROR (Status)) {
