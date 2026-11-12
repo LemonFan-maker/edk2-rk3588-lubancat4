@@ -178,6 +178,26 @@ static struct regulator_init_data  rk806_init_data[] = {
   RK8XX_VOLTAGE_INIT (MASTER_PLDO6,  1800000),  /* pldo6_s3 */
 };
 
+/*
+  Configure one I2C pin: function select, pull-none and Schmitt input.
+
+  Matches the vendor pinctrl macro pcfg_pull_none_smt used by the i2c*_xfer
+  nodes in rk3588s-pinctrl.dtsi.  Needed by the FUSB302 Type-C controller on
+  I2C1, which MassStorageMode uses to detect the USB-C data role.
+*/
+STATIC
+VOID
+ConfigureI2cPin (
+  IN UINT8  Group,
+  IN UINT8  Pin,
+  IN UINT8  Function
+  )
+{
+  GpioPinSetFunction (Group, Pin, Function);
+  GpioPinSetPull (Group, Pin, GPIO_PIN_PULL_NONE);
+  GpioPinSetInput (Group, Pin, GPIO_PIN_INPUT_SCHMITT);
+}
+
 VOID
 EFIAPI
 SdmmcIoMux (
@@ -339,6 +359,18 @@ I2cIomux (
       /* I2C0 M2 (Generic) */
       GpioPinSetFunction (0, GPIO_PIN_PD1, 3);
       GpioPinSetFunction (0, GPIO_PIN_PD2, 3);
+      break;
+
+    case 1:
+      /*
+       * FUSB302 Type-C controller (I2C1 M2), used by MassStorageMode to read
+       * the USB-C data role.  Vendor DTS i2c1m2_xfer is
+       * <0 RK_PD4 9 &pcfg_pull_none_smt> and <0 RK_PD5 9 &pcfg_pull_none_smt>.
+       */
+      ConfigureI2cPin (0, GPIO_PIN_PD4, 9); /* SCL */
+      ConfigureI2cPin (0, GPIO_PIN_PD5, 9); /* SDA */
+      DEBUG ((DEBUG_INFO,
+              "[I2C] Bus1 M2 GPIO0_PD4/PD5 configured (pull-none, Schmitt)\n"));
       break;
 
     /* case 6: REMOVED.
@@ -645,6 +677,19 @@ PlatformEarlyInit (
   EFI_STATUS Status;
 
   DEBUG ((DEBUG_INFO, "[PLATFORM] PlatformEarlyInit started\n"));
+
+  /*
+   * FUSB302 IRQ.  Board DTS fusb302_int (rk3588s-lubancat-4.dts:1517) is
+   * <0 RK_PC6 RK_FUNC_GPIO &pcfg_pull_up>, i.e. function 0 + pull-up + input,
+   * matching the three calls below.  Note the LubanCat-4IO variant uses PD3
+   * instead; PC6 is correct for lbc-4.
+   */
+  GpioPinSetFunction (0, GPIO_PIN_PC6, 0); /* FUSB302 IRQ */
+  GpioPinSetPull (0, GPIO_PIN_PC6, GPIO_PIN_PULL_UP);
+  GpioPinSetDirection (0, GPIO_PIN_PC6, GPIO_PIN_INPUT);
+  DEBUG ((DEBUG_INFO,
+          "[TYPEC] FUSB302 IRQ GPIO0_PC6 configured (pull-up, state=%u)\n",
+          GpioPinReadActual (0, GPIO_PIN_PC6)));
 
   /* Audio Amp Enable */
   GpioPinSetDirection (1, GPIO_PIN_PA6, GPIO_PIN_OUTPUT);

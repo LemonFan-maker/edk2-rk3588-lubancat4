@@ -1,0 +1,53 @@
+## @file
+#  LubanCat4 USB Mass Storage mode application.
+#
+#  SPDX-License-Identifier: BSD-2-Clause-Patent
+##
+
+[Defines]
+  INF_VERSION                    = 0x0001001B
+  BASE_NAME                      = MassStorageMode
+  FILE_GUID                      = 70c5fb56-540c-4f7d-a519-6250a57c7d42
+  MODULE_TYPE                    = UEFI_APPLICATION
+  VERSION_STRING                 = 1.0
+  ENTRY_POINT                    = UefiMain
+
+[Sources]
+  Dwc3Device.c
+  Dwc3Device.h
+  MassStorage.c
+  MassStorage.h
+  MassStorageMode.c
+
+[Packages]
+  EmbeddedPkg/EmbeddedPkg.dec
+  MdeModulePkg/MdeModulePkg.dec
+  MdePkg/MdePkg.dec
+  Silicon/Rockchip/RockchipPkg.dec
+
+[LibraryClasses]
+  BaseLib
+  BaseMemoryLib
+  DebugLib
+  DevicePathLib
+  DmaLib
+  GpioLib
+  IoLib
+  MemoryAllocationLib
+  PrintLib
+  TimerLib
+  UefiApplicationEntryPoint
+  UefiBootServicesTableLib
+  UefiLib
+  UefiRuntimeServicesTableLib
+
+[Protocols]
+  gEdkiiNonDiscoverableDeviceProtocolGuid
+  gEfiBlockIoProtocolGuid
+  gEfiDevicePathProtocolGuid
+  gEfiI2cMasterProtocolGuid
+  gEfiSimpleFileSystemProtocolGuid
+  gRockchipI2cMasterProtocolGuid
+
+[Guids]
+  gEdkiiNonDiscoverableXhciDeviceGuid

@@ -57,10 +57,12 @@
   # 0x43: RK8603 (CPU供电) -> I2C0
   # 0x51: HYM8563 (RTC时钟) -> I2C0
   # 0x11: ES8388 (音频)    -> I2C7
+  # 0x22: FUSB302 (Type-C)  -> I2C1
   # ==========================================================
   
   # 地址列表
 
+  # MSM disabled (suspect for BdsWait hang): I2C1 slave addr 0x22 removed
   gRockchipTokenSpaceGuid.PcdI2cSlaveAddresses|{ 0x42, 0x43, 0x51, 0x11 }
   
   # 【FIXED】 总线映射修正
@@ -96,6 +98,7 @@
   #
 
   gRK3588TokenSpaceGuid.PcdUsbDpPhy0Supported|TRUE
+  gRockchipTokenSpaceGuid.PcdMassStorageModeSupported|FALSE   # MSM disabled
   gRK3588TokenSpaceGuid.PcdDp0LaneMux|{ 0x2, 0x3 }
 
   #
@@ -136,6 +139,8 @@
 ################################################################################
 
 [Components.common]
+  # Silicon/Rockchip/Applications/MassStorageMode/MassStorageMode.inf   # MSM disabled
+
   # ACPI Support
 
   Platform/EmbedFire/LubanCat4/AcpiTables/AcpiTables.inf

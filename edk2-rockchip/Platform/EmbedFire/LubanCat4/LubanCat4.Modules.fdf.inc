@@ -7,6 +7,8 @@
 #
 ##
 
+  # INF Silicon/Rockchip/Applications/MassStorageMode/MassStorageMode.inf   # MSM disabled
+
   # ACPI Support
   
   INF RuleOverride = ACPITABLE Platform/EmbedFire/LubanCat4/AcpiTables/AcpiTables.inf

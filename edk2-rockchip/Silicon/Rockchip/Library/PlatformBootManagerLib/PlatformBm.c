@@ -39,7 +39,10 @@
 
 #include "PlatformBm.h"
 
-#define BOOT_PROMPT  L"Setup (ESC/F2)   Shell (F1)   Reset to MaskROM (F4)   Continue (Enter)"
+#define BOOT_PROMPT  \
+  (FixedPcdGetBool (PcdMassStorageModeSupported) ? \
+   L"Setup (ESC/F2)   Shell (F1)   Mass Storage (F5)   MaskROM (F4)   Continue (Enter)" : \
+   L"Setup (ESC/F2)   Shell (F1)   Reset to MaskROM (F4)   Continue (Enter)")
 
 #define DP_NODE_LEN(Type)  { (UINT8)sizeof (Type), (UINT8)(sizeof (Type) >> 8) }
 
@@ -747,6 +750,7 @@ PlatformRegisterOptionsAndKeys (
   EFI_INPUT_KEY                 Esc;
   EFI_INPUT_KEY                 F1;
   EFI_INPUT_KEY                 F4;
+  EFI_INPUT_KEY                 F5;
   EFI_BOOT_MANAGER_LOAD_OPTION  BootOption;
 
   GetPlatformOptions ();
@@ -800,6 +804,20 @@ PlatformRegisterOptionsAndKeys (
   F4.ScanCode    = SCAN_F4;
   F4.UnicodeChar = CHAR_NULL;
   PlatformRegisterFvBootOption (&gRockchipMaskromResetFileGuid, L"Reset to MaskROM", 0, &F4);
+
+  //
+  // Register the board-specific, read/write USB Mass Storage application.
+  //
+  if (FixedPcdGetBool (PcdMassStorageModeSupported)) {
+    F5.ScanCode    = SCAN_F5;
+    F5.UnicodeChar = CHAR_NULL;
+    PlatformRegisterFvBootOption (
+      &gRockchipMassStorageModeFileGuid,
+      L"USB Mass Storage Mode",
+      0,
+      &F5
+      );
+  }
 }
 
 //
