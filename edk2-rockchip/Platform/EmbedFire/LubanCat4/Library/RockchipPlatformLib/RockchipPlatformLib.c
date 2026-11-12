@@ -674,6 +674,87 @@ PlatformGetDtbFileGuid (
   return NULL;
 }
 
+STATIC
+EFI_STATUS
+SafeInitGpu (
+  VOID
+  )
+{
+  UINT32 Timeout;
+  UINT32 GpuId;
+
+  DEBUG ((DEBUG_INFO, "[GPU] SafeInitGpu: Powering on Mali-G610...\n"));
+
+  /*
+   * Step 1: Power domain PD_GPU (id = 0) via PMU2
+   * SYS_PMU_BASE = 0xFD8D8000
+   * PMU2_PWR_GATE_SFTCON(0) @ 0x014C: bit 0 active-low (0 = power on)
+   */
+  MmioWrite32 (SYS_PMU_BASE + 0x014C, (1U << 16) | 0U);
+
+  /* Poll PMU2_PWR_GATE_ST(0) @ 0x0180 bit 0: wait until 0 (powered on) */
+  Timeout = 1000;
+  while ((MmioRead32 (SYS_PMU_BASE + 0x0180) & BIT0) != 0) {
+    MicroSecondDelay (10);
+    if (--Timeout == 0) {
+      DEBUG ((DEBUG_ERROR, "[GPU] ERROR: PD_GPU power gate timeout!\n"));
+      return EFI_DEVICE_ERROR;
+    }
+  }
+
+  /* Release GPU internal SRAM power gate: PMU2_MEMPWR_GATE_SFTCON(0) @ 0x01A0 */
+  MmioWrite32 (SYS_PMU_BASE + 0x01A0, (1U << 16) | 0U);
+
+  /* Release bus idle request: PMU2_BUS_IDLE_SFTCON(0) @ 0x010C: bit 0 = 0 (active) */
+  MmioWrite32 (SYS_PMU_BASE + 0x010C, (1U << 16) | 0U);
+
+  /* Poll PMU2_BUS_IDLE_ST(0) @ 0x0120 bit 0: wait until 0 (bus active) */
+  Timeout = 1000;
+  while ((MmioRead32 (SYS_PMU_BASE + 0x0120) & BIT0) != 0) {
+    MicroSecondDelay (10);
+    if (--Timeout == 0) {
+      DEBUG ((DEBUG_ERROR, "[GPU] ERROR: BUS_ID_GPU idle release timeout!\n"));
+      return EFI_DEVICE_ERROR;
+    }
+  }
+
+  /*
+   * Step 2: CRU Clocks
+   * Set GPU clock from GPLL (1188MHz / 6 = 198MHz)
+   * CLKSEL_CON158 @ 0x0578: bits[4:0]=div(5), bits[7:5]=GPLL(0), bit 14=normal PLL(0)
+   */
+  DEBUG ((DEBUG_INFO, "[GPU] Enabling Mali-G610 clocks...\n"));
+  MmioWrite32 (CRU_BASE + 0x0578, (0x001FU << 16) | 5U);
+  MmioWrite32 (CRU_BASE + 0x0578, (0x00E0U << 16) | (0U << 5));
+  MmioWrite32 (CRU_BASE + 0x0578, (1U << 30) | (0U << 14));
+
+  /* CLKGATE_CON66 @ 0x0908: Core, NIU, stack clocks */
+  MmioWrite32 (CRU_BASE + 0x0908, 0xFFFF0000U);
+
+  /* CLKGATE_CON67 @ 0x090C: GRF & PVTM clocks */
+  MmioWrite32 (CRU_BASE + 0x090C, 0xFFFF0000U);
+  MicroSecondDelay (20);
+
+  /*
+   * Step 3: CRU Soft Reset Deassertion
+   * SOFTRST_CON66 @ 0x0B08: GPU Core & NIU resets
+   * SOFTRST_CON67 @ 0x0B0C: GPU GRF & PVTM resets
+   */
+  DEBUG ((DEBUG_INFO, "[GPU] Deasserting Mali-G610 resets...\n"));
+  MmioWrite32 (CRU_BASE + 0x0B08, 0xFFFF0000U);
+  MmioWrite32 (CRU_BASE + 0x0B0C, 0xFFFF0000U);
+  MicroSecondDelay (100);
+
+  /*
+   * Step 4: Hardware ID probe at 0xFB000000
+   */
+  GpuId = MmioRead32 (0xFB000000U);
+  DEBUG ((DEBUG_INFO, "[GPU] SUCCESS: Read Mali-G610 GPU_ID @ 0xFB000000 = 0x%08X (Arch=%u, Product=0x%04X)\n",
+          GpuId, (GpuId >> 28) & 0xFU, (GpuId >> 16) & 0xFFFFU));
+
+  return EFI_SUCCESS;
+}
+
 VOID
 EFIAPI
 PlatformEarlyInit (
@@ -737,6 +818,12 @@ PlatformEarlyInit (
   MmioWrite32 (CRU_BASE + 0x0A78, (BIT(6) | BIT(7) | BIT(8) | BIT(9) | BIT(10) | BIT(11)) << 16);
 
   MicroSecondDelay (100);
+
+  /* GPU (Mali-G610) Initialization */
+  Status = SafeInitGpu();
+  if (EFI_ERROR (Status)) {
+    DEBUG ((DEBUG_WARN, "[GPU] WARNING: GPU init failed: %r\n", Status));
+  }
 
   DEBUG ((DEBUG_INFO, "[PLATFORM] PlatformEarlyInit done\n"));
 
